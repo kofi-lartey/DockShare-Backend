@@ -10,6 +10,7 @@ import userRoutes from './routes/userRoutes.js';
 import subscriptionRoutes from './routes/subscriptionRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
 import webhookRoutes from './routes/webhookRoutes.js';
+import paymentRoutes from './routes/paymentRoutes.js';
 
 dotenv.config();
 
@@ -31,6 +32,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/subscription', subscriptionRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/webhook', webhookRoutes);
+app.use('/api/payment', paymentRoutes);
 
 app.get('/health', (req, res) => {
   res.json({
