@@ -3,8 +3,9 @@ import bcrypt from 'bcryptjs';
 import { File } from '../models/File.js';
 import { User } from '../models/User.js';
 import { sendViewNotification } from '../config/email.js';
-import { generateShareableLink, getFileTypeCategory } from '../utils/helpers.js';
+import { generateShareableLink, getFileTypeCategory, generateQRCode } from '../utils/helpers.js';
 import { PLAN_LIMITS } from '../utils/constants.js';
+import { FRONTEND_URL } from '../config/env.js';
 
 export const uploadFile = async (req, res) => {
   try {
@@ -250,6 +251,15 @@ export const getFile = async (req, res) => {
     const fileResponse = file.toObject();
     delete fileResponse.password;
 
+    if (file.qrCodeGenerated || req.query.generateQR === 'true') {
+      try {
+        const qrDataUrl = await generateQRCode(`${FRONTEND_URL}/view/${file.shareableLink}`);
+        fileResponse.qrCode = qrDataUrl;
+      } catch (qrError) {
+        console.error('QR generation error:', qrError);
+      }
+    }
+
     res.json({
       success: true,
       data: fileResponse,
@@ -297,11 +307,21 @@ export const verifyPassword = async (req, res) => {
       });
     }
 
+    const responseData = {
+      fileData: file.fileData
+    };
+
+    if (file.qrCodeGenerated) {
+      try {
+        responseData.qrCode = await generateQRCode(`${FRONTEND_URL}/view/${file.shareableLink}`);
+      } catch (qrError) {
+        console.error('QR generation error:', qrError);
+      }
+    }
+
     res.json({
       success: true,
-      data: {
-        fileData: file.fileData
-      },
+      data: responseData,
       message: 'Password verified successfully'
     });
   } catch (error) {

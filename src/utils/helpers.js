@@ -1,7 +1,22 @@
 import crypto from 'crypto';
+import QRCode from 'qrcode';
 
 export const generateShareableLink = () => {
   return crypto.randomBytes(10).toString('hex');
+};
+
+export const generateQRCode = async (text, options = {}) => {
+  const defaultOptions = {
+    width: 300,
+    margin: 2,
+    color: {
+      dark: '#000000',
+      light: '#FFFFFF'
+    },
+    errorCorrectionLevel: 'M',
+    ...options
+  };
+  return await QRCode.toDataURL(text, defaultOptions);
 };
 
 export const generateInvoiceNumber = () => {
