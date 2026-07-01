@@ -3,7 +3,8 @@ import {
   createSubscription, 
   getSubscription, 
   cancelSubscription, 
-  getInvoices 
+  getInvoices,
+  verifyPaystackPayment
 } from '../controllers/subscriptionController.js';
 import { auth } from '../middleware/auth.js';
 
@@ -15,5 +16,6 @@ subscriptionRoutes.get('/', getSubscription);
 subscriptionRoutes.post('/', createSubscription);
 subscriptionRoutes.post('/cancel', cancelSubscription);
 subscriptionRoutes.get('/invoices', getInvoices);
+subscriptionRoutes.get('/verify-paystack/:reference', verifyPaystackPayment);
 
 export default subscriptionRoutes;

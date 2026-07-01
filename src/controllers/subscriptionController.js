@@ -220,3 +220,54 @@ export const getInvoices = async (req, res) => {
     });
   }
 };
+
+export const verifyPaystackPayment = async (req, res) => {
+  try {
+    const { reference } = req.params;
+    const result = await paystackService.verifyTransaction(reference);
+    
+    if (result.data.status === 'success') {
+      const subscription = await Subscription.findOne({ transactionRef: reference });
+      if (subscription) {
+        subscription.status = 'active';
+        subscription.provider = 'paystack';
+        await subscription.save();
+        
+        const user = await User.findById(subscription.userId);
+        if (user) {
+          user.subscriptionStatus = 'active';
+          user.plan = subscription.plan;
+          await user.save();
+        }
+        
+        const invoice = await Invoice.findOne({ 
+          transactionRef: reference, 
+          provider: 'paystack' 
+        });
+        if (invoice) {
+          invoice.status = 'paid';
+          invoice.paidAt = new Date();
+          await invoice.save();
+        }
+      }
+      
+      res.json({
+        success: true,
+        message: 'Payment verified successfully',
+        data: result.data
+      });
+    } else {
+      res.json({
+        success: false,
+        message: 'Payment not successful',
+        data: result.data
+      });
+    }
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to verify payment',
+      error: error.message
+    });
+  }
+};
