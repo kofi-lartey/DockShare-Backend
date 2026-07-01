@@ -24,7 +24,7 @@ export const createSubscription = async (req, res) => {
     let provider = paymentMethod || 'stripe';
 
     if (planId !== 'free') {
-      const prices = { pro: 19, express: 49 };
+      const prices = { pro: 20, express: 50 };
       const amount = prices[planId];
 
       if (provider === 'stripe') {
@@ -52,7 +52,8 @@ export const createSubscription = async (req, res) => {
     const nextBillingDate = new Date();
     nextBillingDate.setMonth(nextBillingDate.getMonth() + 1);
 
-    const prices = { free: 0, pro: 19, express: 49 };
+    const prices = { free: 0, pro: 20, express: 50 };
+    const currency = provider === 'paystack' ? 'GHS' : 'USD';
 
     if (subscription) {
       subscription.plan = planId;
@@ -95,7 +96,7 @@ export const createSubscription = async (req, res) => {
       userId: user._id,
       invoiceNumber: generateInvoiceNumber(),
       amount: prices[planId],
-      currency: 'USD',
+      currency,
       status: planId === 'free' ? 'paid' : 'pending',
       plan: planId,
       provider,
@@ -122,9 +123,11 @@ export const createSubscription = async (req, res) => {
       message: planId === 'free' ? 'Free plan activated' : 'Subscription created, complete payment',
     });
   } catch (error) {
+    console.error('Subscription creation error:', error.message);
     res.status(500).json({
       success: false,
       message: 'Failed to create subscription',
+      error: error.message,
     });
   }
 };

@@ -4,6 +4,6 @@ import { handleStripeWebhook, handlePaystackWebhook } from '../controllers/webho
 const webhookRoutes = express.Router();
 
 webhookRoutes.post('/stripe', express.raw({ type: 'application/json' }), handleStripeWebhook);
-webhookRoutes.post('/paystack', express.raw({ type: 'application/json' }), handlePaystackWebhook);
+webhookRoutes.post('/paystack', handlePaystackWebhook);
 
 export default webhookRoutes;

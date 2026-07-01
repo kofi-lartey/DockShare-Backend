@@ -84,7 +84,7 @@ export const handleStripeWebhook = async (req, res) => {
 export const handlePaystackWebhook = async (req, res) => {
   const signature = req.headers['x-paystack-signature'];
   
-  if (!paystackService.verifyWebhook(signature)) {
+  if (!paystackService.verifyWebhook(signature, req.body)) {
     return res.status(401).json({ error: 'Invalid signature' });
   }
   

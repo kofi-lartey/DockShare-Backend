@@ -1,4 +1,5 @@
 import axios from 'axios';
+import crypto from 'crypto';
 
 const PAYSTACK_API_URL = 'https://api.paystack.co';
 
@@ -41,7 +42,12 @@ export const paystackService = {
     return response.data.data;
   },
 
-  verifyWebhook: (signature) => {
-    return signature === process.env.PAYSTACK_WEBHOOK_SECRET;
+  verifyWebhook: (signature, body) => {
+    const secret = process.env.PAYSTACK_WEBHOOK_SECRET;
+    if (!secret) return true;
+    const hmac = crypto.createHmac('sha512', secret);
+    const payload = Buffer.isBuffer(body) ? body : Buffer.from(JSON.stringify(body));
+    const hash = hmac.update(payload).digest('hex');
+    return signature === hash;
   },
 };
