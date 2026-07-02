@@ -25,7 +25,8 @@ const isLocalhost = (origin) => {
     origin === 'http://localhost' ||
     origin === 'http://127.0.0.1' ||
     origin.startsWith('http://localhost:') ||
-    origin.startsWith('http://127.0.0.1:')
+    origin.startsWith('http://127.0.0.1:') ||
+    origin.startsWith('https://localhost:')
   );
 };
 
@@ -34,7 +35,7 @@ const originMatches = (origin, pattern) => {
   const normalizedPattern = normalizeOrigin(pattern);
   if (normalizedOrigin === normalizedPattern) return true;
   if (isLocalhost(normalizedPattern) && isLocalhost(normalizedOrigin)) {
-    return normalizedOrigin === normalizedPattern;
+    return true;
   }
   return false;
 };
@@ -42,6 +43,10 @@ const originMatches = (origin, pattern) => {
 const isOriginAllowed = (origin, allowedOrigins) => {
   if (!origin || origin === 'null') return false;
   if (allowedOrigins.includes('*')) return true;
+  
+  // Allow any localhost origin by default for development flexibility
+  if (isLocalhost(origin)) return true;
+  
   return allowedOrigins.some((pattern) => originMatches(origin, pattern));
 };
 
