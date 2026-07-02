@@ -6,13 +6,13 @@ import {
   verifyPassword, 
   deleteFile 
 } from '../controllers/fileController.js';
-import { auth } from '../middleware/auth.js';
+import { requireOnboarding } from '../middleware/auth.js';
 import { upload } from '../config/multer.js';
 import { rateLimiter } from '../middleware/rateLimiter.js';
 
 const fileRoutes = express.Router();
 
-fileRoutes.use(auth);
+fileRoutes.use(requireOnboarding);
 
 fileRoutes.post('/upload', upload.single('file'), rateLimiter, uploadFile);
 fileRoutes.get('/', getFiles);

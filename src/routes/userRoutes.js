@@ -6,11 +6,11 @@ import {
   getNotifications,
   getProfile
 } from '../controllers/userController.js';
-import { auth } from '../middleware/auth.js';
+import { requireOnboarding } from '../middleware/auth.js';
 
 const userRoutes = express.Router();
 
-userRoutes.use(auth);
+userRoutes.use(requireOnboarding);
 
 userRoutes.get('/profile', getProfile);
 userRoutes.put('/profile', updateProfile);

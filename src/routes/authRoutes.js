@@ -4,9 +4,11 @@ import {
   login, 
   verifyEmail, 
   forgotPassword, 
-  resetPassword 
+  resetPassword,
+  getOnboardingStatus
 } from '../controllers/authController.js';
 import { rateLimiter } from '../middleware/rateLimiter.js';
+import { auth } from '../middleware/auth.js';
 
 const authRoutes = express.Router();
 
@@ -15,5 +17,6 @@ authRoutes.post('/login', rateLimiter, login);
 authRoutes.get('/verify-email/:token', verifyEmail);
 authRoutes.post('/forgot-password', rateLimiter, forgotPassword);
 authRoutes.post('/reset-password/:token', rateLimiter, resetPassword);
+authRoutes.get('/onboarding-status', auth, getOnboardingStatus);
 
 export default authRoutes;

@@ -30,14 +30,8 @@ export const register = async (req, res) => {
       fullName,
       email: email.toLowerCase(),
       password: hashedPassword,
+      subscriptionStatus: 'incomplete',
       avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=6366f1&color=fff&size=128`
-    });
-
-    await Subscription.create({
-      userId: user._id,
-      plan: 'free',
-      status: 'active',
-      startDate: new Date()
     });
 
     const verificationToken = crypto.randomBytes(32).toString('hex');
@@ -46,8 +40,6 @@ export const register = async (req, res) => {
     await user.save();
 
     await sendVerificationEmail(user.email, verificationToken);
-
-    const token = user.generateAuthToken();
 
     const userData = user.toObject();
     delete userData.password;
@@ -58,10 +50,7 @@ export const register = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      data: {
-        ...userData,
-        token
-      },
+      data: userData,
       message: 'Registration successful. Please check your email to confirm your account.'
     });
   } catch (error) {
@@ -94,6 +83,14 @@ export const login = async (req, res) => {
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password'
+      });
+    }
+
+    if (!user.emailVerified) {
+      return res.status(403).json({
+        success: false,
+        message: 'Email not verified. Please check your inbox and confirm your email before logging in.',
+        code: 'EMAIL_NOT_VERIFIED'
       });
     }
 
@@ -230,6 +227,59 @@ export const resetPassword = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to reset password'
+    });
+  }
+};
+
+export const getOnboardingStatus = async (req, res) => {
+  try {
+    const user = req.user;
+    const subscription = await Subscription.findOne({ userId: user._id });
+
+    let step = 'registration';
+    let nextStep = 'verify_email';
+    let completedSteps = [];
+
+    if (user.emailVerified) {
+      step = 'verified';
+      nextStep = 'select_plan';
+      completedSteps = ['registration', 'verify_email'];
+
+      if (subscription) {
+        if (subscription.plan === 'free' && subscription.status === 'active') {
+          step = 'complete';
+          nextStep = null;
+          completedSteps = ['registration', 'verify_email', 'select_plan'];
+        } else if (user.subscriptionStatus === 'active') {
+          step = 'complete';
+          nextStep = null;
+          completedSteps = ['registration', 'verify_email', 'select_plan', 'payment'];
+        } else {
+          step = 'payment_pending';
+          nextStep = 'complete_payment';
+          completedSteps = ['registration', 'verify_email', 'select_plan'];
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      data: {
+        step,
+        nextStep,
+        completedSteps,
+        emailVerified: user.emailVerified,
+        subscription: subscription ? {
+          plan: subscription.plan,
+          status: subscription.status,
+          provider: subscription.provider
+        } : null
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve onboarding status'
     });
   }
 };

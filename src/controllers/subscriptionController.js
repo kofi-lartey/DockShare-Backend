@@ -11,6 +11,14 @@ export const createSubscription = async (req, res) => {
     const { planId, paymentMethod, paymentMethodId } = req.body;
     const user = req.user;
 
+    if (!user.emailVerified) {
+      return res.status(403).json({
+        success: false,
+        message: 'Please verify your email before selecting a plan',
+        code: 'EMAIL_NOT_VERIFIED'
+      });
+    }
+
     const validPlans = ['free', 'pro', 'express'];
     if (!validPlans.includes(planId)) {
       return res.status(400).json({
@@ -57,7 +65,7 @@ export const createSubscription = async (req, res) => {
 
     if (subscription) {
       subscription.plan = planId;
-      subscription.status = planId === 'free' ? 'active' : 'trialing';
+      subscription.status = planId === 'free' ? 'active' : 'pending';
       subscription.paymentMethodId = paymentMethodId;
       subscription.nextBillingDate = nextBillingDate;
       subscription.cancelAtPeriodEnd = false;
@@ -77,7 +85,7 @@ export const createSubscription = async (req, res) => {
       subscription = await Subscription.create({
         userId: user._id,
         plan: planId,
-        status: planId === 'free' ? 'active' : 'trialing',
+        status: planId === 'free' ? 'active' : 'pending',
         paymentMethodId,
         provider,
         transactionRef,
