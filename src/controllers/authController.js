@@ -5,6 +5,7 @@ import { User } from '../models/User.js';
 import { Subscription } from '../models/Subscription.js';
 import { sendVerificationEmail, sendPasswordResetEmail } from '../config/email.js';
 import { validateRegistration, validateLogin, validatePassword } from '../utils/validators.js';
+import { jwtBlacklist } from '../utils/jwtBlacklist.js';
 
 export const register = async (req, res) => {
   try {
@@ -99,7 +100,7 @@ export const login = async (req, res) => {
 
     const expiresIn = rememberMe ? '30d' : process.env.JWT_EXPIRES_IN;
     const token = jwt.sign(
-      { id: user._id, email: user.email, plan: user.plan },
+      { id: user._id, email: user.email, plan: user.plan, jti: crypto.randomUUID() },
       process.env.JWT_SECRET,
       { expiresIn }
     );
@@ -280,6 +281,26 @@ export const getOnboardingStatus = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve onboarding status'
+    });
+  }
+};
+
+export const logout = async (req, res) => {
+  try {
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+
+    if (token) {
+      jwtBlacklist.add(token);
+    }
+
+    res.json({
+      success: true,
+      message: 'Logged out successfully'
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: 'Invalid token'
     });
   }
 };

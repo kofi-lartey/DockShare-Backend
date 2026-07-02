@@ -1,29 +1,45 @@
 import jwt from 'jsonwebtoken';
 import { User } from '../models/User.js';
+import { jwtBlacklist } from '../utils/jwtBlacklist.js';
+
+const verifyToken = async (token) => {
+  if (!token) {
+    return { error: 'Authentication required', status: 401 };
+  }
+
+  if (jwtBlacklist.has(token)) {
+    return { error: 'Token has been revoked', status: 401 };
+  }
+
+  let decoded;
+  try {
+    decoded = jwt.verify(token, process.env.JWT_SECRET);
+  } catch {
+    return { error: 'Invalid or expired token', status: 401 };
+  }
+
+  const user = await User.findById(decoded.id).select('-password');
+  if (!user) {
+    return { error: 'User not found', status: 401 };
+  }
+
+  return { user, token };
+};
 
 export const auth = async (req, res, next) => {
   try {
     const token = req.header('Authorization')?.replace('Bearer ', '');
-    
-    if (!token) {
-      return res.status(401).json({
+    const result = await verifyToken(token);
+
+    if (result.error) {
+      return res.status(result.status).json({
         success: false,
-        message: 'Authentication required'
+        message: result.error
       });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.id).select('-password');
-
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: 'User not found'
-      });
-    }
-
-    req.user = user;
-    req.token = token;
+    req.user = result.user;
+    req.token = result.token;
     next();
   } catch (error) {
     res.status(401).json({
@@ -36,25 +52,16 @@ export const auth = async (req, res, next) => {
 export const requireVerified = async (req, res, next) => {
   try {
     const token = req.header('Authorization')?.replace('Bearer ', '');
-    
-    if (!token) {
-      return res.status(401).json({
+    const result = await verifyToken(token);
+
+    if (result.error) {
+      return res.status(result.status).json({
         success: false,
-        message: 'Authentication required'
+        message: result.error
       });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.id).select('-password');
-
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: 'User not found'
-      });
-    }
-
-    if (!user.emailVerified) {
+    if (!result.user.emailVerified) {
       return res.status(403).json({
         success: false,
         message: 'Email verification required. Please check your inbox and confirm your email.',
@@ -62,8 +69,8 @@ export const requireVerified = async (req, res, next) => {
       });
     }
 
-    req.user = user;
-    req.token = token;
+    req.user = result.user;
+    req.token = result.token;
     next();
   } catch (error) {
     res.status(401).json({
@@ -76,25 +83,16 @@ export const requireVerified = async (req, res, next) => {
 export const requireOnboarding = async (req, res, next) => {
   try {
     const token = req.header('Authorization')?.replace('Bearer ', '');
-    
-    if (!token) {
-      return res.status(401).json({
+    const result = await verifyToken(token);
+
+    if (result.error) {
+      return res.status(result.status).json({
         success: false,
-        message: 'Authentication required'
+        message: result.error
       });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.id).select('-password');
-
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: 'User not found'
-      });
-    }
-
-    if (!user.emailVerified) {
+    if (!result.user.emailVerified) {
       return res.status(403).json({
         success: false,
         message: 'Email verification required. Please check your inbox and confirm your email.',
@@ -102,7 +100,7 @@ export const requireOnboarding = async (req, res, next) => {
       });
     }
 
-    if (user.subscriptionStatus !== 'active') {
+    if (result.user.subscriptionStatus !== 'active') {
       return res.status(403).json({
         success: false,
         message: 'Please complete your subscription to access the dashboard.',
@@ -110,8 +108,8 @@ export const requireOnboarding = async (req, res, next) => {
       });
     }
 
-    req.user = user;
-    req.token = token;
+    req.user = result.user;
+    req.token = result.token;
     next();
   } catch (error) {
     res.status(401).json({
