@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { User } from '../models/User.js';
 import { Subscription } from '../models/Subscription.js';
-import { sendVerificationEmail, sendPasswordResetEmail } from '../config/email.js';
+import { sendOtpEmail, sendPasswordResetEmail } from '../config/email.js';
 import { validateRegistration, validateLogin, validatePassword } from '../utils/validators.js';
 import { jwtBlacklist } from '../utils/jwtBlacklist.js';
 
@@ -35,17 +35,21 @@ export const register = async (req, res) => {
       avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=6366f1&color=fff&size=128`
     });
 
-    const verificationToken = crypto.randomBytes(32).toString('hex');
-    user.emailVerificationToken = verificationToken;
-    user.emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    user.emailOTP = otp;
+    user.emailOTPExpires = new Date(Date.now() + 10 * 60 * 1000);
+    user.emailOTPSentAt = new Date();
     await user.save();
 
-    await sendVerificationEmail(user.email, verificationToken);
+    await sendOtpEmail(user.email, otp);
 
     const userData = user.toObject();
     delete userData.password;
     delete userData.emailVerificationToken;
     delete userData.emailVerificationExpires;
+    delete userData.emailOTP;
+    delete userData.emailOTPExpires;
+    delete userData.emailOTPSentAt;
     delete userData.resetPasswordToken;
     delete userData.resetPasswordExpires;
 
@@ -109,6 +113,9 @@ export const login = async (req, res) => {
     delete userData.password;
     delete userData.emailVerificationToken;
     delete userData.emailVerificationExpires;
+    delete userData.emailOTP;
+    delete userData.emailOTPExpires;
+    delete userData.emailOTPSentAt;
     delete userData.resetPasswordToken;
     delete userData.resetPasswordExpires;
 
@@ -128,23 +135,81 @@ export const login = async (req, res) => {
   }
 };
 
-export const verifyEmail = async (req, res) => {
+export const resendVerification = async (req, res) => {
   try {
-    const { token } = req.params;
+    const { email } = req.body;
+
+    if (!email || !email.includes('@')) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please enter a valid email address'
+      });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+
+    if (!user) {
+      return res.status(200).json({
+        success: true,
+        message: 'If an account with that email exists, a verification email has been sent.'
+      });
+    }
+
+    if (user.emailVerified) {
+      return res.status(200).json({
+        success: true,
+        message: 'If an account with that email exists, a verification email has been sent.'
+      });
+    }
+
+    if (user.emailOTPSentAt && (Date.now() - user.emailOTPSentAt.getTime()) < 60000) {
+      return res.status(429).json({
+        success: false,
+        message: 'Please wait 60 seconds before requesting a new code.'
+      });
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    user.emailOTP = otp;
+    user.emailOTPExpires = new Date(Date.now() + 10 * 60 * 1000);
+    user.emailOTPSentAt = new Date();
+    await user.save();
+
+    await sendOtpEmail(user.email, otp);
+
+    res.status(200).json({
+      success: true,
+      message: 'If an account with that email exists, a verification code has been sent.'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send verification email. Please try again.'
+    });
+  }
+};
+
+export const verifyOtp = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
 
     const user = await User.findOne({
-      emailVerificationToken: token,
-      emailVerificationExpires: { $gt: new Date() }
+      email: email.toLowerCase(),
+      emailOTP: otp,
+      emailOTPExpires: { $gt: new Date() }
     });
 
     if (!user) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid or expired verification token'
+        message: 'Invalid or expired OTP'
       });
     }
 
     user.emailVerified = true;
+    user.emailOTP = undefined;
+    user.emailOTPExpires = undefined;
+    user.emailOTPSentAt = undefined;
     user.emailVerificationToken = undefined;
     user.emailVerificationExpires = undefined;
     await user.save();

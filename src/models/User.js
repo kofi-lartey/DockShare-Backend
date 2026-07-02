@@ -64,6 +64,9 @@ const userSchema = new mongoose.Schema({
   resetPasswordExpires: Date,
   emailVerificationToken: String,
   emailVerificationExpires: Date,
+  emailOTP: String,
+  emailOTPExpires: Date,
+  emailOTPSentAt: Date,
   notifications: {
     emailNotifications: { type: Boolean, default: true },
     uploadSuccess: { type: Boolean, default: true },

@@ -71,6 +71,20 @@ export const sendVerificationEmail = async (email, token) => {
   return sendEmail(email, 'Verify Your Email Address', html);
 };
 
+export const sendOtpEmail = async (email, otp) => {
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h2 style="color: #6366f1;">Verify Your Email Address</h2>
+      <p>Your OTP verification code is:</p>
+      <div style="display: inline-block; background: #f3f4f6; padding: 16px 24px; border-radius: 8px; margin: 16px 0;">
+        <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #6366f1;">${otp}</span>
+      </div>
+      <p>This code will expire in 10 minutes. If you didn't request this, please ignore this email.</p>
+    </div>
+  `;
+  return sendEmail(email, 'Your OTP Verification Code', html);
+};
+
 export const sendPasswordResetEmail = async (email, token) => {
   const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${token}`;
   const html = `
