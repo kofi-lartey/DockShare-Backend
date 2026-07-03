@@ -88,13 +88,29 @@ export const handlePaystackWebhook = async (req, res) => {
     return res.status(401).json({ error: 'Invalid signature' });
   }
   
-  const event = req.body;
+  const event = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
   
   try {
     switch (event.event) {
       case 'charge.success': {
         const charge = event.data;
         const reference = charge.reference;
+        
+        const subscription = await Subscription.findOne({ 
+          transactionRef: reference,
+          provider: 'paystack'
+        });
+        if (subscription) {
+          subscription.status = 'active';
+          await subscription.save();
+          
+          const user = await User.findById(subscription.userId);
+          if (user) {
+            user.subscriptionStatus = 'active';
+            user.plan = subscription.plan;
+            await user.save();
+          }
+        }
         
         const invoice = await Invoice.findOne({ 
           transactionRef: reference,
@@ -104,18 +120,6 @@ export const handlePaystackWebhook = async (req, res) => {
           invoice.status = 'paid';
           invoice.paidAt = new Date();
           await invoice.save();
-        }
-        
-        const subscription = await Subscription.findOne({ userId: invoice?.userId });
-        if (subscription) {
-          subscription.status = 'active';
-          await subscription.save();
-          
-          const user = await User.findById(subscription.userId);
-          if (user) {
-            user.subscriptionStatus = 'active';
-            await user.save();
-          }
         }
         break;
       }
