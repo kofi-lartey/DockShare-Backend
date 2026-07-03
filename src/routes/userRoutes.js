@@ -14,7 +14,7 @@ userRoutes.use(requireOnboarding);
 
 userRoutes.get('/profile', getProfile);
 userRoutes.put('/profile', updateProfile);
-userRoutes.post('/change-password', changePassword);
+userRoutes.post('/password', changePassword);
 userRoutes.put('/preferences', updatePreferences);
 userRoutes.get('/notifications', getNotifications);
 
