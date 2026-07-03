@@ -95,8 +95,8 @@ export const createSubscription = async (req, res) => {
     }
 
     user.plan = planId;
-    user.subscriptionStatus = subscription.status;
-    user.subscriptionStartDate = subscription.startDate;
+    user.subscriptionStatus = planId === 'free' ? 'active' : 'incomplete';
+    user.subscriptionStartDate = subscription.startDate || new Date();
     user.nextBillingDate = nextBillingDate;
     await user.save();
 
