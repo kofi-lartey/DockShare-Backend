@@ -236,6 +236,7 @@ export const verifyPaystackPayment = async (req, res) => {
     
     if (result.data.status === 'success') {
       const subscription = await Subscription.findOne({ transactionRef: reference });
+      
       if (subscription) {
         subscription.status = 'active';
         subscription.provider = 'paystack';
@@ -259,10 +260,53 @@ export const verifyPaystackPayment = async (req, res) => {
         }
       }
       
+      let userResp = null;
+      if (req.user) {
+        const userObj = req.user.toObject();
+        delete userObj.password;
+        delete userObj.emailVerificationToken;
+        delete userObj.emailVerificationExpires;
+        delete userObj.emailOTP;
+        delete userObj.emailOTPExpires;
+        delete userObj.emailOTPSentAt;
+        delete userObj.resetPasswordToken;
+        delete userObj.resetPasswordExpires;
+        userResp = { ...userObj, token: req.user.generateAuthToken() };
+      } else {
+        const userData = subscription ? await User.findById(subscription.userId) : null;
+        if (userData) {
+          const userObj = userData.toObject();
+          delete userObj.password;
+          delete userObj.emailVerificationToken;
+          delete userObj.emailVerificationExpires;
+          delete userObj.emailOTP;
+          delete userObj.emailOTPExpires;
+          delete userObj.emailOTPSentAt;
+          delete userObj.resetPasswordToken;
+          delete userObj.resetPasswordExpires;
+          userResp = { ...userObj, token: userData.generateAuthToken() };
+        }
+      }
+      
+      const invoice = subscription ? await Invoice.findOne({ 
+        transactionRef: reference, 
+        provider: 'paystack' 
+      }) : null;
+      let invoiceResp = null;
+      if (invoice) {
+        invoiceResp = { ...invoice.toObject() };
+        delete invoiceResp.pdfUrl;
+      }
+      
       res.json({
         success: true,
         message: 'Payment verified successfully',
-        data: result.data
+        data: {
+          ...result.data,
+          user: userResp,
+          subscription,
+          invoice: invoiceResp
+        }
       });
     } else {
       res.json({
