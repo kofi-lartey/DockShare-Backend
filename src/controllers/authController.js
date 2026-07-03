@@ -214,8 +214,25 @@ export const verifyOtp = async (req, res) => {
     user.emailVerificationExpires = undefined;
     await user.save();
 
+    const userData = user.toObject();
+    delete userData.password;
+    delete userData.emailVerificationToken;
+    delete userData.emailVerificationExpires;
+    delete userData.emailOTP;
+    delete userData.emailOTPExpires;
+    delete userData.emailOTPSentAt;
+    delete userData.resetPasswordToken;
+    delete userData.resetPasswordExpires;
+
+    const token = jwt.sign(
+      { id: user._id, email: user.email, plan: user.plan, jti: crypto.randomUUID() },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+    );
+
     res.json({
       success: true,
+      data: { ...userData, token },
       message: 'Email verified successfully'
     });
   } catch (error) {
