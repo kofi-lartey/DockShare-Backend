@@ -102,9 +102,14 @@ fileSchema.index({ expiresAt: 1 });
 fileSchema.index({ shareableLink: 1 });
 fileSchema.index({ name: 'text' });
 
-fileSchema.methods.incrementViews = function() {
+fileSchema.methods.incrementViews = function(viewerInfo = {}) {
   this.views += 1;
   this.lastViewedAt = new Date();
+  this.viewHistory.push({
+    timestamp: new Date(),
+    ip: viewerInfo.ip,
+    userAgent: viewerInfo.userAgent
+  });
   return this.save();
 };
 

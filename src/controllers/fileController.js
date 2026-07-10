@@ -284,7 +284,10 @@ export const getFile = async (req, res) => {
     }
 
     if (!isOwner) {
-      await file.incrementViews();
+      await file.incrementViews({
+        ip: req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip,
+        userAgent: req.headers['user-agent']
+      });
       if (file.notifyOnView) {
         const user = await User.findById(file.userId);
         if (user?.notifications?.viewNotifications) {
