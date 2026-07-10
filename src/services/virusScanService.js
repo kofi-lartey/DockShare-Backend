@@ -65,4 +65,6 @@ export const scanBuffer = async (buffer) => {
   return { infected: !!isInfected, viruses: viruses || [], scanned: true };
 };
 
-export const virusScanService = { scanBuffer, isEnabled: () => CLAMAV_ENABLED };
+export const isEnabled = () => CLAMAV_ENABLED;
+
+export const virusScanService = { scanBuffer, isEnabled };
