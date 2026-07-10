@@ -16,7 +16,9 @@ export const CLOUDINARY_API_SECRET = process.env.CLOUDINARY_API_SECRET;
 export const CLOUDINARY_UPLOAD_FOLDER = process.env.CLOUDINARY_UPLOAD_FOLDER || 'docshare';
 
 // ClamAV / clamd integration
-export const CLAMAV_ENABLED = process.env.CLAMAV_ENABLED !== 'false';
+// Opt-in: scanning only runs when explicitly enabled. This prevents uploads
+// from failing on deployments where clamd is not running.
+export const CLAMAV_ENABLED = process.env.CLAMAV_ENABLED === 'true';
 export const CLAMAV_HOST = process.env.CLAMAV_HOST || '127.0.0.1';
 export const CLAMAV_PORT = parseInt(process.env.CLAMAV_PORT || '3310', 10);
 export const CLAMAV_TIMEOUT_MS = parseInt(process.env.CLAMAV_TIMEOUT_MS || '30000', 10);
