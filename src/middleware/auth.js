@@ -49,6 +49,22 @@ export const auth = async (req, res, next) => {
   }
 };
 
+export const optionalAuth = async (req, res, next) => {
+  try {
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    const result = await verifyToken(token);
+
+    if (!result.error) {
+      req.user = result.user;
+      req.token = result.token;
+    }
+
+    next();
+  } catch (error) {
+    next();
+  }
+};
+
 export const requireVerified = async (req, res, next) => {
   try {
     const token = req.header('Authorization')?.replace('Bearer ', '');
