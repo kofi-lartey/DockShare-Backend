@@ -86,6 +86,14 @@ const userSchema = new mongoose.Schema({
   lastActivity: {
     type: Date,
     default: Date.now
+  },
+  // Privacy consent for analytics & geolocation (GDPR/DPDP). Stored with the
+  // policy version accepted so we can re-prompt on changes.
+  privacyConsent: {
+    analytics: { type: Boolean, default: false },
+    geoTracking: { type: Boolean, default: false },
+    consentVersion: { type: String, default: null },
+    consentedAt: { type: Date, default: null }
   }
 }, {
   timestamps: true

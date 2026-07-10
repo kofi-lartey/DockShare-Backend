@@ -294,7 +294,8 @@ export const getFile = async (req, res) => {
     }
 
     if (!isOwner) {
-      await file.incrementViews({
+      const { recordView } = await import('../services/analyticsService.js');
+      await recordView(file._id, {
         ip: req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip,
         userAgent: req.headers['user-agent']
       });

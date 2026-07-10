@@ -87,11 +87,18 @@ const fileSchema = new mongoose.Schema({
   lastViewedAt: {
     type: Date
   },
+  // Bounded inline cache of recent viewers, sliced to the most recent N
+  // entries by analyticsService.recordView. The durable, TTL-expiring
+  // history is kept in the separate ViewEvent collection.
   viewHistory: [{
     timestamp: { type: Date, default: Date.now },
     ip: String,
     userAgent: String
-  }]
+  }],
+  downloadCount: {
+    type: Number,
+    default: 0
+  }
 }, {
   timestamps: true
 });
@@ -102,6 +109,8 @@ fileSchema.index({ expiresAt: 1 });
 fileSchema.index({ shareableLink: 1 });
 fileSchema.index({ name: 'text' });
 
+// Bounded atomic increment used by analyticsService. Keeps the inline
+// viewHistory cache at a fixed size to prevent unbounded document growth.
 fileSchema.methods.incrementViews = function(viewerInfo = {}) {
   this.views += 1;
   this.lastViewedAt = new Date();
@@ -110,6 +119,9 @@ fileSchema.methods.incrementViews = function(viewerInfo = {}) {
     ip: viewerInfo.ip,
     userAgent: viewerInfo.userAgent
   });
+  if (this.viewHistory.length > 20) {
+    this.viewHistory = this.viewHistory.slice(-20);
+  }
   return this.save();
 };
 

@@ -10,6 +10,8 @@ import subscriptionRoutes from './routes/subscriptionRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
 import webhookRoutes from './routes/webhookRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
+import ogRoutes from './routes/ogRoutes.js';
+import couponRoutes from './routes/couponRoutes.js';
 import { corsMiddleware } from './config/cors.js';
 
 dotenv.config();
@@ -32,6 +34,8 @@ app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/webhook', webhookRoutes);
 app.use('/api/payment', paymentRoutes);
+app.use('/api/og', ogRoutes);
+app.use('/api/coupons', couponRoutes);
 
 app.get('/health', (req, res) => {
   res.json({

@@ -4,7 +4,10 @@ import {
   changePassword, 
   updatePreferences, 
   getNotifications,
-  getProfile
+  getProfile,
+  updateConsent,
+  exportUserData,
+  deleteUserData
 } from '../controllers/userController.js';
 import { requireOnboarding } from '../middleware/auth.js';
 
@@ -17,5 +20,8 @@ userRoutes.put('/profile', updateProfile);
 userRoutes.post('/password', changePassword);
 userRoutes.put('/preferences', updatePreferences);
 userRoutes.get('/notifications', getNotifications);
+userRoutes.put('/consent', updateConsent);
+userRoutes.get('/data-export', exportUserData);
+userRoutes.delete('/data', deleteUserData);
 
 export default userRoutes;

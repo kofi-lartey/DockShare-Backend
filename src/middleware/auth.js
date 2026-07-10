@@ -96,6 +96,32 @@ export const requireVerified = async (req, res, next) => {
   }
 };
 
+export const requireAdmin = async (req, res, next) => {
+  try {
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    const result = await verifyToken(token);
+
+    if (result.error) {
+      return res.status(result.status).json({ success: false, message: result.error });
+    }
+
+    const adminEmails = (process.env.ADMIN_EMAILS || '')
+      .split(',')
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean);
+
+    if (!adminEmails.includes(result.user.email.toLowerCase())) {
+      return res.status(403).json({ success: false, message: 'Admin access required' });
+    }
+
+    req.user = result.user;
+    req.token = result.token;
+    next();
+  } catch (error) {
+    res.status(401).json({ success: false, message: 'Invalid or expired token' });
+  }
+};
+
 export const requireOnboarding = async (req, res, next) => {
   try {
     const token = req.header('Authorization')?.replace('Bearer ', '');

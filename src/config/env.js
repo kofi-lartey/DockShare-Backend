@@ -14,3 +14,12 @@ export const CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME;
 export const CLOUDINARY_API_KEY = process.env.CLOUDINARY_API_KEY;
 export const CLOUDINARY_API_SECRET = process.env.CLOUDINARY_API_SECRET;
 export const CLOUDINARY_UPLOAD_FOLDER = process.env.CLOUDINARY_UPLOAD_FOLDER || 'docshare';
+
+// ClamAV / clamd integration
+export const CLAMAV_ENABLED = process.env.CLAMAV_ENABLED !== 'false';
+export const CLAMAV_HOST = process.env.CLAMAV_HOST || '127.0.0.1';
+export const CLAMAV_PORT = parseInt(process.env.CLAMAV_PORT || '3310', 10);
+export const CLAMAV_TIMEOUT_MS = parseInt(process.env.CLAMAV_TIMEOUT_MS || '30000', 10);
+// 'closed' (default) rejects uploads when the scanner is unavailable/errors;
+// 'open' allows uploads through when scanning cannot be performed.
+export const CLAMAV_FAIL_MODE = process.env.CLAMAV_FAIL_MODE || 'closed';

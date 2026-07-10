@@ -39,6 +39,14 @@ const subscriptionSchema = new mongoose.Schema({
   transactionRef: {
     type: String
   },
+  couponCode: {
+    type: String,
+    uppercase: true
+  },
+  couponRedeemed: {
+    type: Boolean,
+    default: false
+  },
   lastPaymentDate: {
     type: Date
   },

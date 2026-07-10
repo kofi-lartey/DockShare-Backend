@@ -36,6 +36,10 @@ const invoiceSchema = new mongoose.Schema({
   transactionRef: {
     type: String
   },
+  couponCode: {
+    type: String,
+    uppercase: true
+  },
   description: {
     type: String
   },

@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { User } from '../models/User.js';
 import { File } from '../models/File.js';
+import { DownloadEvent } from '../models/DownloadEvent.js';
 import { validateProfileUpdate, validatePasswordChange } from '../utils/validators.js';
 
 export const updateProfile = async (req, res) => {
@@ -119,12 +120,70 @@ export const getNotifications = async (req, res) => {
   }
 };
 
+export const updateConsent = async (req, res) => {
+  try {
+    const { analytics, geoTracking, consentVersion } = req.body;
+    const update = {};
+    if (typeof analytics === 'boolean') update['privacyConsent.analytics'] = analytics;
+    if (typeof geoTracking === 'boolean') update['privacyConsent.geoTracking'] = geoTracking;
+    if (consentVersion) update['privacyConsent.consentVersion'] = consentVersion;
+    update['privacyConsent.consentedAt'] = new Date();
+
+    const user = await User.findByIdAndUpdate(req.user._id, update, { new: true })
+      .select('privacyConsent');
+
+    res.json({
+      success: true,
+      data: user.privacyConsent,
+      message: 'Privacy consent updated'
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to update consent' });
+  }
+};
+
+export const exportUserData = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select('-password');
+    const files = await File.find({ userId: req.user._id }).select('name size type views downloadCount createdAt');
+    const downloadEvents = await DownloadEvent.find({ ownerId: req.user._id })
+      .select('fileId timestamp country consentVersion')
+      .lean();
+
+    res.json({
+      success: true,
+      data: {
+        user,
+        files,
+        downloadEvents
+      },
+      message: 'Data export ready'
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to export data' });
+  }
+};
+
+export const deleteUserData = async (req, res) => {
+  try {
+    // Erase download analytics (the only PII-bearing collection the user owns).
+    const result = await DownloadEvent.deleteMany({ ownerId: req.user._id });
+    res.json({
+      success: true,
+      message: 'Personal analytics data deleted',
+      deleted: result.deletedCount
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to delete data' });
+  }
+};
+
 export const getProfile = async (req, res) => {
   try {
     const user = await User.findById(req.user._id).select('-password -emailVerificationToken -emailVerificationExpires -resetPasswordToken -resetPasswordExpires');
-    
+
     const usage = await File.getUserUsage(req.user._id);
-    
+
     res.json({
       success: true,
       data: {

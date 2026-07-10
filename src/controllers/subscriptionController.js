@@ -5,10 +5,11 @@ import { File } from '../models/File.js';
 import { generateInvoiceNumber } from '../utils/helpers.js';
 import { stripeService } from '../services/stripeService.js';
 import { paystackService } from '../services/paystackService.js';
+import { validateCoupon } from '../services/couponService.js';
 
 export const createSubscription = async (req, res) => {
   try {
-    const { planId, paymentMethod, paymentMethodId } = req.body;
+    const { planId, paymentMethod, paymentMethodId, couponCode } = req.body;
     const user = req.user;
 
     if (!user.emailVerified) {
@@ -27,19 +28,35 @@ export const createSubscription = async (req, res) => {
       });
     }
 
+    let couponResult = null;
+    if (planId !== 'free' && couponCode) {
+      const baseAmount = { pro: 20, express: 50 }[planId];
+      try {
+        couponResult = await validateCoupon(couponCode, planId, baseAmount);
+      } catch (err) {
+        return res.status(400).json({
+          success: false,
+          message: err.message,
+          code: err.code || 'COUPON_ERROR'
+        });
+      }
+    }
+
     let paymentResult;
     let transactionRef = null;
     let provider = paymentMethod || 'stripe';
 
     if (planId !== 'free') {
-      const prices = { pro: 20, express: 50 };
-      const amount = prices[planId];
+      const basePrices = { pro: 20, express: 50 };
+      const amount = couponResult ? couponResult.finalAmount : basePrices[planId];
 
       if (provider === 'stripe') {
         const session = await stripeService.createCheckoutSession({
           planType: planId,
           userId: user._id,
           email: user.email,
+          amount,
+          couponCode: couponResult ? couponResult.code : undefined
         });
         transactionRef = session.id;
         paymentResult = { sessionUrl: session.url };
@@ -49,6 +66,7 @@ export const createSubscription = async (req, res) => {
           amount,
           planType: planId,
           userId: user._id,
+          couponCode: couponResult ? couponResult.code : undefined
         });
         transactionRef = result.data.reference;
         paymentResult = { authorizationUrl: result.data.authorization_url };
@@ -61,6 +79,7 @@ export const createSubscription = async (req, res) => {
     nextBillingDate.setMonth(nextBillingDate.getMonth() + 1);
 
     const prices = { free: 0, pro: 20, express: 50 };
+    const finalAmount = couponResult ? couponResult.finalAmount : prices[planId];
     const currency = provider === 'paystack' ? 'GHS' : 'USD';
 
     if (subscription) {
@@ -71,13 +90,15 @@ export const createSubscription = async (req, res) => {
       subscription.cancelAtPeriodEnd = false;
       subscription.provider = provider;
       subscription.transactionRef = transactionRef;
+      subscription.couponCode = couponResult ? couponResult.code : subscription.couponCode;
       subscription.lastPaymentDate = planId === 'free' ? new Date() : null;
       subscription.paymentHistory.push({
         date: new Date(),
-        amount: prices[planId],
+        amount: finalAmount,
         status: planId === 'free' ? 'success' : 'pending',
         provider,
         transactionRef,
+        couponCode: couponResult ? couponResult.code : undefined
       });
       await subscription.save();
       subscription = await Subscription.findOne({ userId: user._id });
@@ -89,6 +110,7 @@ export const createSubscription = async (req, res) => {
         paymentMethodId,
         provider,
         transactionRef,
+        couponCode: couponResult ? couponResult.code : undefined,
         nextBillingDate,
         lastPaymentDate: planId === 'free' ? new Date() : null,
       });
@@ -103,12 +125,13 @@ export const createSubscription = async (req, res) => {
     const invoice = await Invoice.create({
       userId: user._id,
       invoiceNumber: generateInvoiceNumber(),
-      amount: prices[planId],
+      amount: finalAmount,
       currency,
       status: planId === 'free' ? 'paid' : 'pending',
       plan: planId,
       provider,
       transactionRef,
+      couponCode: couponResult ? couponResult.code : undefined,
       description: `${planId.charAt(0).toUpperCase() + planId.slice(1)} Plan Subscription`,
       billingPeriod: {
         start: new Date(),

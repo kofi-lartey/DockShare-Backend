@@ -101,3 +101,26 @@ export const getClientIP = (req) => {
     req.ip ||
     'unknown';
 };
+
+/**
+ * Produces a privacy-preserving, salted hash of an IP address so that we can
+ * correlate download events without storing raw PII. The secret salt comes
+ * from the environment and is never persisted alongside the hash.
+ */
+export const hashIP = (ip) => {
+  if (!ip || ip === 'unknown') return null;
+  const salt = process.env.IP_HASH_SECRET || 'docshare-default-salt';
+  return crypto.createHash('sha256').update(`${salt}:${ip}`).digest('hex');
+};
+
+/**
+ * Truncates an IPv4 address to its /24 prefix (drops the last octet) for
+ * coarse-grained, non-reidentifying geo rollups when full geolocation is
+ * not consented to.
+ */
+export const anonymizeIP = (ip) => {
+  if (!ip || ip === 'unknown') return null;
+  const v4 = ip.match(/^(\d{1,3}\.){3}\d{1,3}$/);
+  if (v4) return ip.split('.').slice(0, 3).join('.') + '.0';
+  return ip; // IPv6 – leave as-is (already coarse)
+};

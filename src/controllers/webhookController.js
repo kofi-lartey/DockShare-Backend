@@ -1,8 +1,21 @@
 import { stripeService } from '../services/stripeService.js';
 import { paystackService } from '../services/paystackService.js';
+import { redeemCoupon } from '../services/couponService.js';
 import { Subscription } from '../models/Subscription.js';
 import { Invoice } from '../models/Invoice.js';
 import { User } from '../models/User.js';
+
+// Idempotently redeems a coupon once per subscription/payment.
+const redeemIfNeeded = async (subscription, transactionRef) => {
+  if (!subscription?.couponCode || subscription.couponRedeemed) return;
+  const updated = await Subscription.updateOne(
+    { _id: subscription._id, couponRedeemed: false },
+    { $set: { couponRedeemed: true } }
+  );
+  if (updated.modifiedCount > 0) {
+    await redeemCoupon(subscription.couponCode, transactionRef);
+  }
+};
 
 export const handleStripeWebhook = async (req, res) => {
   const signature = req.headers['stripe-signature'];
@@ -40,6 +53,7 @@ export const handleStripeWebhook = async (req, res) => {
           user.subscriptionStatus = 'active';
           await user.save();
         }
+        await redeemIfNeeded(subscription, session.id);
         break;
       }
       
@@ -121,6 +135,7 @@ export const handlePaystackWebhook = async (req, res) => {
           invoice.paidAt = new Date();
           await invoice.save();
         }
+        await redeemIfNeeded(subscription, reference);
         break;
       }
     }
