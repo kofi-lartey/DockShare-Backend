@@ -1,12 +1,16 @@
-import { scanBuffer } from '../services/virusScanService.js';
+import { scanBuffer, isEnabled } from '../services/virusScanService.js';
 
 /**
  * Express middleware that virus-scans the uploaded file buffer before it
  * reaches the upload controller. Must run after multer's upload.single().
  * Rejects infected files with 422 and, in closed fail-mode, when the scanner
- * is unavailable.
+ * is unavailable. When scanning is disabled it passes the request through.
  */
 export const virusScan = async (req, res, next) => {
+  if (!isEnabled()) {
+    return next();
+  }
+
   if (!req.file || !req.file.buffer) {
     return next();
   }
