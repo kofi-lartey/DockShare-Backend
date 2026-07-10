@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import { File } from '../models/File.js';
 import { User } from '../models/User.js';
 import { sendViewNotification } from '../config/email.js';
-import { generateShareableLink, getFileTypeCategory, generateQRCode } from '../utils/helpers.js';
+import { generateShareableLink, getFileTypeCategory, generateQRCode, getPdfPageCount } from '../utils/helpers.js';
 import { PLAN_LIMITS } from '../utils/constants.js';
 import { FRONTEND_URL } from '../config/env.js';
 import { uploadToCloudinary, deleteFromCloudinary } from '../config/cloudinary.js';
@@ -108,13 +108,23 @@ export const uploadFile = async (req, res) => {
       }
     }
 
+    // Determine page count for PDFs. Detect it directly from the uploaded
+    // file buffer so we don't rely on a value the client may not send.
+    let pages = null;
+    if (file.mimetype === 'application/pdf') {
+      const detectedPages = await getPdfPageCount(file.buffer);
+      pages = detectedPages || (pagesCount ? parseInt(pagesCount) : 1);
+    } else if (pagesCount) {
+      pages = parseInt(pagesCount);
+    }
+
     const newFile = await File.create({
       userId: user._id,
       name: fileName || file.originalname,
       originalName: file.originalname,
       size: newFileSize,
       type: file.mimetype,
-      pages: pagesCount ? parseInt(pagesCount) : (file.mimetype === 'application/pdf' ? 1 : null),
+      pages,
       fileData: null,
       filePath: cloudinaryUrl,
       cloudinaryPublicId,

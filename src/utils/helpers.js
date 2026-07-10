@@ -1,5 +1,26 @@
 import crypto from 'crypto';
 import QRCode from 'qrcode';
+import { PDFDocument } from 'pdf-lib';
+
+/**
+ * Detects the number of pages in a PDF from its raw buffer.
+ * Returns the page count, or null if it cannot be determined
+ * (e.g. the buffer is not a valid/parseable PDF).
+ */
+export const getPdfPageCount = async (buffer) => {
+  try {
+    if (!buffer || !buffer.length) return null;
+    const pdfDoc = await PDFDocument.load(buffer, {
+      ignoreEncryption: true,
+      updateMetadata: false
+    });
+    const count = pdfDoc.getPageCount();
+    return count > 0 ? count : null;
+  } catch (error) {
+    console.error('Failed to detect PDF page count:', error.message);
+    return null;
+  }
+};
 
 export const generateShareableLink = () => {
   return crypto.randomBytes(16).toString('base64url');
