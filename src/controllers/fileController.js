@@ -83,6 +83,16 @@ export const uploadFile = async (req, res) => {
       fileData = file.buffer.toString('base64');
     }
 
+    const shareableLink = generateShareableLink();
+    let qrCodeDataUrl = null;
+    if (generateQR === 'true') {
+      try {
+        qrCodeDataUrl = await generateQRCode(`${FRONTEND_URL}/view/${shareableLink}`);
+      } catch (qrError) {
+        console.error('QR generation error:', qrError);
+      }
+    }
+
     const newFile = await File.create({
       userId: user._id,
       name: fileName || file.originalname,
@@ -91,11 +101,12 @@ export const uploadFile = async (req, res) => {
       type: file.mimetype,
       pages: pagesCount ? parseInt(pagesCount) : (file.mimetype === 'application/pdf' ? 1 : null),
       fileData: fileData,
-      shareableLink: generateShareableLink(),
+      shareableLink,
       requirePassword: requirePassword === 'true',
       password: hashedPassword,
       expiresAt: setExpiry === 'true' ? expiresAt : null,
       qrCodeGenerated: generateQR === 'true',
+      qrCode: qrCodeDataUrl,
       notifyOnView: notifyOnView === 'true'
     });
 
@@ -109,7 +120,10 @@ export const uploadFile = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      data: fileResponse,
+      data: {
+        ...fileResponse,
+        shareableUrl: `${FRONTEND_URL}/view/${newFile.shareableLink}`
+      },
       message: 'File uploaded successfully'
     });
   } catch (error) {
@@ -195,6 +209,15 @@ export const getFile = async (req, res) => {
     const { id } = req.params;
     const { password } = req.query;
 
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(id);
+
+    if (isObjectId && !req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required to access this file'
+      });
+    }
+
     const file = await File.findOne({
       $or: [
         { _id: id },
@@ -250,14 +273,10 @@ export const getFile = async (req, res) => {
 
     const fileResponse = file.toObject();
     delete fileResponse.password;
+    delete fileResponse.fileData;
 
-    if (file.qrCodeGenerated || req.query.generateQR === 'true') {
-      try {
-        const qrDataUrl = await generateQRCode(`${FRONTEND_URL}/view/${file.shareableLink}`);
-        fileResponse.qrCode = qrDataUrl;
-      } catch (qrError) {
-        console.error('QR generation error:', qrError);
-      }
+    if (file.qrCode) {
+      fileResponse.qrCode = file.qrCode;
     }
 
     res.json({
@@ -311,12 +330,8 @@ export const verifyPassword = async (req, res) => {
       fileData: file.fileData
     };
 
-    if (file.qrCodeGenerated) {
-      try {
-        responseData.qrCode = await generateQRCode(`${FRONTEND_URL}/view/${file.shareableLink}`);
-      } catch (qrError) {
-        console.error('QR generation error:', qrError);
-      }
+    if (file.qrCode) {
+      responseData.qrCode = file.qrCode;
     }
 
     res.json({

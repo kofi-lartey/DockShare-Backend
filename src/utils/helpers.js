@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import QRCode from 'qrcode';
 
 export const generateShareableLink = () => {
-  return crypto.randomBytes(10).toString('hex');
+  return crypto.randomBytes(16).toString('base64url');
 };
 
 export const generateQRCode = async (text, options = {}) => {

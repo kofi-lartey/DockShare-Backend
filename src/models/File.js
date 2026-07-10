@@ -69,6 +69,10 @@ const fileSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  qrCode: {
+    type: String,
+    default: null
+  },
   notifyOnView: {
     type: Boolean,
     default: false
