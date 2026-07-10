@@ -242,10 +242,9 @@ export const getFile = async (req, res) => {
     }
 
     const file = await File.findOne({
-      $or: [
-        { _id: id },
-        { shareableLink: id }
-      ]
+      $or: isObjectId
+        ? [{ _id: id }, { shareableLink: id }]
+        : [{ shareableLink: id }]
     }).select('+password');
 
     if (!file) {
@@ -328,11 +327,12 @@ export const verifyPassword = async (req, res) => {
     const { id } = req.params;
     const { password } = req.body;
 
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(id);
+
     const file = await File.findOne({
-      $or: [
-        { _id: id },
-        { shareableLink: id }
-      ]
+      $or: isObjectId
+        ? [{ _id: id }, { shareableLink: id }]
+        : [{ shareableLink: id }]
     }).select('+password');
 
     if (!file) {
