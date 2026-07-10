@@ -10,3 +10,7 @@ export const STRIPE_EXPRESS_PRICE_ID = process.env.STRIPE_EXPRESS_PRICE_ID;
 export const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 export const PAYSTACK_WEBHOOK_SECRET = process.env.PAYSTACK_WEBHOOK_SECRET;
 export const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+export const CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME;
+export const CLOUDINARY_API_KEY = process.env.CLOUDINARY_API_KEY;
+export const CLOUDINARY_API_SECRET = process.env.CLOUDINARY_API_SECRET;
+export const CLOUDINARY_UPLOAD_FOLDER = process.env.CLOUDINARY_UPLOAD_FOLDER || 'docshare';
