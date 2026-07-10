@@ -6,6 +6,7 @@ import { sendViewNotification } from '../config/email.js';
 import { generateShareableLink, getFileTypeCategory, generateQRCode } from '../utils/helpers.js';
 import { PLAN_LIMITS } from '../utils/constants.js';
 import { FRONTEND_URL } from '../config/env.js';
+import { uploadToCloudinary, deleteFromCloudinary } from '../config/cloudinary.js';
 
 export const uploadFile = async (req, res) => {
   try {
@@ -78,9 +79,23 @@ export const uploadFile = async (req, res) => {
       hashedPassword = await bcrypt.hash(password, salt);
     }
 
-    let fileData = null;
-    if (file && file.buffer) {
-      fileData = file.buffer.toString('base64');
+    let cloudinaryPublicId = null;
+    let cloudinaryUrl = null;
+    try {
+      const uploadResult = await uploadToCloudinary(
+        file.buffer,
+        file.originalname,
+        file.mimetype
+      );
+      cloudinaryPublicId = uploadResult.public_id;
+      cloudinaryUrl = uploadResult.secure_url;
+    } catch (uploadError) {
+      console.error('Cloudinary upload error:', uploadError);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to upload file to cloud storage. Please try again.',
+        error: process.env.NODE_ENV === 'development' ? uploadError.message : undefined
+      });
     }
 
     const shareableLink = generateShareableLink();
@@ -100,7 +115,9 @@ export const uploadFile = async (req, res) => {
       size: newFileSize,
       type: file.mimetype,
       pages: pagesCount ? parseInt(pagesCount) : (file.mimetype === 'application/pdf' ? 1 : null),
-      fileData: fileData,
+      fileData: null,
+      filePath: cloudinaryUrl,
+      cloudinaryPublicId,
       shareableLink,
       requirePassword: requirePassword === 'true',
       password: hashedPassword,
@@ -122,6 +139,7 @@ export const uploadFile = async (req, res) => {
       success: true,
       data: {
         ...fileResponse,
+        filePath: cloudinaryUrl,
         shareableUrl: `${FRONTEND_URL}/view/${newFile.shareableLink}`
       },
       message: 'File uploaded successfully'
@@ -280,6 +298,12 @@ export const getFile = async (req, res) => {
     delete fileResponse.password;
     delete fileResponse.fileData;
 
+    if (file.filePath) {
+      fileResponse.filePath = file.filePath;
+    } else if (file.fileData) {
+      fileResponse.fileData = file.fileData;
+    }
+
     if (file.qrCode) {
       fileResponse.qrCode = file.qrCode;
     }
@@ -333,9 +357,13 @@ export const verifyPassword = async (req, res) => {
       });
     }
 
-    const responseData = {
-      fileData: file.fileData
-    };
+    const responseData = {};
+
+    if (file.filePath) {
+      responseData.filePath = file.filePath;
+    } else if (file.fileData) {
+      responseData.fileData = file.fileData;
+    }
 
     if (file.qrCode) {
       responseData.qrCode = file.qrCode;
@@ -368,6 +396,14 @@ export const deleteFile = async (req, res) => {
         success: false,
         message: 'File not found'
       });
+    }
+
+    if (file.cloudinaryPublicId) {
+      try {
+        await deleteFromCloudinary(file.cloudinaryPublicId);
+      } catch (cloudinaryError) {
+        console.error('Failed to delete from Cloudinary:', cloudinaryError);
+      }
     }
 
     file.status = 'deleted';

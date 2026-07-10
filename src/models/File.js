@@ -34,10 +34,17 @@ const fileSchema = new mongoose.Schema({
   },
   fileData: {
     type: String,
-    required: true
+    default: null,
+    required: false
   },
   filePath: {
-    type: String
+    type: String,
+    default: null
+  },
+  cloudinaryPublicId: {
+    type: String,
+    default: null,
+    index: true
   },
   views: {
     type: Number,
