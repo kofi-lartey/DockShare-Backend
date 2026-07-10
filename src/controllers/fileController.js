@@ -181,10 +181,15 @@ export const getFiles = async (req, res) => {
 
     const stats = await File.getUserUsage(req.user._id);
 
+    const filesWithUrl = files.map(file => ({
+      ...file.toObject(),
+      shareableUrl: `${FRONTEND_URL}/view/${file.shareableLink}`
+    }));
+
     res.json({
       success: true,
       data: {
-        files,
+        files: filesWithUrl,
         total,
         page: parseInt(page),
         totalPages: Math.ceil(total / limit),
@@ -278,6 +283,8 @@ export const getFile = async (req, res) => {
     if (file.qrCode) {
       fileResponse.qrCode = file.qrCode;
     }
+
+    fileResponse.shareableUrl = `${FRONTEND_URL}/view/${file.shareableLink}`;
 
     res.json({
       success: true,
