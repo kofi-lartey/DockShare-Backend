@@ -4,8 +4,10 @@ import crypto from 'crypto';
 import { User } from '../models/User.js';
 import { Subscription } from '../models/Subscription.js';
 import { sendOtpEmail, sendPasswordResetEmail } from '../config/email.js';
-import { validateRegistration, validateLogin, validatePassword } from '../utils/validators.js';
+import { validateRegistration, validateLogin, validatePassword, validateSendOtpLogin, validateLoginWithOtp } from '../utils/validators.js';
 import { jwtBlacklist } from '../utils/jwtBlacklist.js';
+
+const generateRandomPassword = () => crypto.randomBytes(16).toString('hex');
 
 export const register = async (req, res) => {
   try {
@@ -135,37 +137,32 @@ export const login = async (req, res) => {
   }
 };
 
-export const resendVerification = async (req, res) => {
+export const sendOtpLogin = async (req, res) => {
   try {
     const { email } = req.body;
 
-    if (!email || !email.includes('@')) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please enter a valid email address'
-      });
+    const errors = validateSendOtpLogin({ email });
+    if (errors) {
+      return res.status(400).json({ success: false, errors });
     }
 
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const normalizedEmail = email.toLowerCase();
+    let user = await User.findOne({ email: normalizedEmail });
+    let isNewUser = false;
 
     if (!user) {
-      return res.status(200).json({
-        success: true,
-        message: 'If an account with that email exists, a verification email has been sent.'
-      });
-    }
+      isNewUser = true;
+      const randomPassword = generateRandomPassword();
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(randomPassword, salt);
 
-    if (user.emailVerified) {
-      return res.status(200).json({
-        success: true,
-        message: 'If an account with that email exists, a verification email has been sent.'
-      });
-    }
-
-    if (user.emailOTPSentAt && (Date.now() - user.emailOTPSentAt.getTime()) < 60000) {
-      return res.status(429).json({
-        success: false,
-        message: 'Please wait 60 seconds before requesting a new code.'
+      user = await User.create({
+        fullName: normalizedEmail.split('@')[0],
+        email: normalizedEmail,
+        password: hashedPassword,
+        subscriptionStatus: 'incomplete',
+        emailVerified: true,
+        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(normalizedEmail.split('@')[0])}&background=6366f1&color=fff&size=128`
       });
     }
 
@@ -179,12 +176,75 @@ export const resendVerification = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'If an account with that email exists, a verification code has been sent.'
+      message: isNewUser
+        ? 'Account created. A verification code has been sent to your email.'
+        : 'A verification code has been sent to your email.',
+      data: { email: user.email, isNewUser }
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: 'Failed to send verification email. Please try again.'
+      message: 'Failed to send verification code. Please try again.'
+    });
+  }
+};
+
+export const loginWithOtp = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    const errors = validateLoginWithOtp({ email, otp });
+    if (errors) {
+      return res.status(400).json({ success: false, errors });
+    }
+
+    const user = await User.findOne({
+      email: email.toLowerCase(),
+      emailOTP: otp,
+      emailOTPExpires: { $gt: new Date() }
+    });
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid or expired OTP'
+      });
+    }
+
+    user.lastActivity = new Date();
+    user.emailOTP = undefined;
+    user.emailOTPExpires = undefined;
+    user.emailOTPSentAt = undefined;
+    await user.save();
+
+    const userData = user.toObject();
+    delete userData.password;
+    delete userData.emailVerificationToken;
+    delete userData.emailVerificationExpires;
+    delete userData.emailOTP;
+    delete userData.emailOTPExpires;
+    delete userData.emailOTPSentAt;
+    delete userData.resetPasswordToken;
+    delete userData.resetPasswordExpires;
+
+    const token = jwt.sign(
+      { id: user._id, email: user.email, plan: user.plan, jti: crypto.randomUUID() },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+    );
+
+    res.json({
+      success: true,
+      data: {
+        ...userData,
+        token
+      },
+      message: 'Login successful'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Login failed. Please try again.'
     });
   }
 };
@@ -239,6 +299,60 @@ export const verifyOtp = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Email verification failed'
+    });
+  }
+};
+
+export const resendVerification = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email || !email.includes('@')) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please enter a valid email address'
+      });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+
+    if (!user) {
+      return res.status(200).json({
+        success: true,
+        message: 'If an account with that email exists, a verification email has been sent.'
+      });
+    }
+
+    if (user.emailVerified) {
+      return res.status(200).json({
+        success: true,
+        message: 'If an account with that email exists, a verification email has been sent.'
+      });
+    }
+
+    if (user.emailOTPSentAt && (Date.now() - user.emailOTPSentAt.getTime()) < 60000) {
+      return res.status(429).json({
+        success: false,
+        message: 'Please wait 60 seconds before requesting a new code.'
+      });
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    user.emailOTP = otp;
+    user.emailOTPExpires = new Date(Date.now() + 10 * 60 * 1000);
+    user.emailOTPSentAt = new Date();
+    await user.save();
+
+    await sendOtpEmail(user.email, otp);
+
+    res.status(200).json({
+      success: true,
+      message: 'If an account with that email exists, a verification code has been sent.'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send verification email. Please try again.'
     });
   }
 };

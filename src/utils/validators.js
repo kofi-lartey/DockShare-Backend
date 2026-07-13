@@ -33,6 +33,29 @@ export const validateLogin = ({ email, password }) => {
   return errors.length > 0 ? errors : null;
 };
 
+export const validateSendOtpLogin = ({ email }) => {
+  const errors = [];
+
+  if (!email || !email.includes('@')) {
+    errors.push({ field: 'email', message: 'Please enter a valid email address' });
+  }
+
+  return errors.length > 0 ? errors : null;
+};
+
+export const validateLoginWithOtp = ({ email, otp }) => {
+  const errors = [];
+
+  if (!email || !email.includes('@')) {
+    errors.push({ field: 'email', message: 'Please enter a valid email address' });
+  }
+  if (!otp || otp.length !== 6) {
+    errors.push({ field: 'otp', message: 'Please enter a valid 6-digit OTP' });
+  }
+
+  return errors.length > 0 ? errors : null;
+};
+
 export const validatePassword = ({ password, confirmPassword }) => {
   const errors = [];
 
