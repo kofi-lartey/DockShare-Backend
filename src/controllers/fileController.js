@@ -7,6 +7,7 @@ import { generateShareableLink, getFileTypeCategory, generateQRCode, getPdfPageC
 import { PLAN_LIMITS } from '../utils/constants.js';
 import { FRONTEND_URL } from '../config/env.js';
 import { uploadToCloudinary, deleteFromCloudinary } from '../config/cloudinary.js';
+import { convertOfficeToPdf } from '../services/officeConvertService.js';
 
 export const uploadFile = async (req, res) => {
   try {
@@ -332,6 +333,96 @@ export const getFile = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve file'
+    });
+  }
+};
+
+export const convertToPdf = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { password } = req.body || {};
+
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(id);
+
+    if (isObjectId && !req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required to access this file',
+      });
+    }
+
+    const file = await File.findOne({
+      $or: isObjectId
+        ? [{ _id: id }, { shareableLink: id }]
+        : [{ shareableLink: id }],
+    }).select('+password');
+
+    if (!file) {
+      return res.status(404).json({ success: false, message: 'File not found' });
+    }
+
+    if (file.isExpired()) {
+      file.status = 'expired';
+      await file.save();
+      return res.status(410).json({ success: false, message: 'This file has expired' });
+    }
+
+    const isOwner = req.user && file.userId.toString() === req.user._id.toString();
+
+    if (file.requirePassword && !isOwner) {
+      if (!password) {
+        return res.status(401).json({ success: false, message: 'Password required', requirePassword: true });
+      }
+      const isMatch = await bcrypt.compare(password, file.password);
+      if (!isMatch) {
+        return res.status(401).json({ success: false, message: 'Incorrect password' });
+      }
+    }
+
+    // Resolve the document bytes (Cloudinary URL or inline base64).
+    let buffer;
+    if (file.filePath) {
+      const upstream = await fetch(file.filePath);
+      if (!upstream.ok) {
+        return res.status(502).json({ success: false, message: 'Failed to fetch source file for conversion.' });
+      }
+      buffer = Buffer.from(await upstream.arrayBuffer());
+    } else if (file.fileData) {
+      buffer = Buffer.from(file.fileData, 'base64');
+    } else {
+      return res.status(404).json({ success: false, message: 'No source data available for conversion.' });
+    }
+
+    const ext = (file.originalName || file.name || 'document.docx').includes('.')
+      ? (file.originalName || file.name).split('.').pop()
+      : 'docx';
+
+    const pdfBuffer = await convertOfficeToPdf(buffer, ext);
+    const base64 = pdfBuffer.toString('base64');
+
+    res.json({
+      success: true,
+      data: {
+        fileData: base64,
+        type: 'application/pdf',
+        name: `${(file.name || 'document').replace(/\.[^.]+$/, '')}.pdf`,
+        pages: null,
+      },
+      message: 'Document converted to PDF',
+    });
+  } catch (error) {
+    if (error.code === 'LO_NOT_AVAILABLE') {
+      return res.status(501).json({
+        success: false,
+        code: 'LO_NOT_AVAILABLE',
+        message: error.message,
+      });
+    }
+    console.error('Conversion error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to convert document',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
 };

@@ -4,7 +4,8 @@ import {
   getFiles, 
   getFile, 
   verifyPassword, 
-  deleteFile 
+  deleteFile,
+  convertToPdf
 } from '../controllers/fileController.js';
 import { auth, optionalAuth } from '../middleware/auth.js';
 import { upload } from '../config/multer.js';
@@ -19,6 +20,7 @@ fileRoutes.post('/upload', auth, upload.single('file'), rateLimiter, virusScan, 
 fileRoutes.get('/', auth, getFiles);
 fileRoutes.get('/:id', optionalAuth, getFile);
 fileRoutes.post('/:id/verify-password', verifyPassword);
+fileRoutes.post('/:id/convert-pdf', optionalAuth, convertToPdf);
 fileRoutes.delete('/:id', auth, deleteFile);
 // Records a download for analytics (honours owner privacy consent).
 fileRoutes.post('/:id/download', optionalAuth, trackDownload);
