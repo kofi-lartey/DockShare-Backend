@@ -12,6 +12,8 @@ import webhookRoutes from './routes/webhookRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import ogRoutes from './routes/ogRoutes.js';
 import couponRoutes from './routes/couponRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
+import { bootstrapAdminFromEnv } from './controllers/adminAuthController.js';
 import { corsMiddleware } from './config/cors.js';
 
 dotenv.config();
@@ -20,7 +22,7 @@ const app = express();
 
 app.set('trust proxy', 1);
 
-connectDB();
+connectDB().then(() => bootstrapAdminFromEnv());
 
 app.use(helmet());
 app.use(corsMiddleware);
@@ -36,6 +38,7 @@ app.use('/webhook', webhookRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/api/og', ogRoutes);
 app.use('/api/coupons', couponRoutes);
+app.use('/api/admin', adminRoutes);
 
 app.get('/health', (req, res) => {
   res.json({

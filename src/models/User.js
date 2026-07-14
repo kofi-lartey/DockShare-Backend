@@ -60,6 +60,37 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  // ---- Admin / Superuser ----
+  // role 'admin' === superuser: inherits every standard user privilege AND
+  // owns all `admin.*` scopes. Exactly one administrator may exist.
+  role: {
+    type: String,
+    enum: ['user', 'admin'],
+    default: 'user'
+  },
+  // Granular permission scopes. Admins implicitly hold ['user.*','admin.*'].
+  permissions: {
+    type: [String],
+    default: []
+  },
+  // bcrypt hash of the unique Admin Code used as the second MFA factor.
+  // Never returned to the client; select:false.
+  adminCodeHash: {
+    type: String,
+    select: false
+  },
+  // Chosen MFA method: password+adminCode (Option A) or email OTP+adminCode (Option B).
+  mfaMethod: {
+    type: String,
+    enum: ['password+code', 'otp+code'],
+    default: 'password+code'
+  },
+  // Account state managed from the admin console.
+  status: {
+    type: String,
+    enum: ['active', 'suspended'],
+    default: 'active'
+  },
   resetPasswordToken: String,
   resetPasswordExpires: Date,
   emailVerificationToken: String,
@@ -101,6 +132,7 @@ const userSchema = new mongoose.Schema({
 
 userSchema.index({ email: 1 });
 userSchema.index({ plan: 1 });
+userSchema.index({ role: 1 });
 userSchema.index({ subscriptionStatus: 1 });
 
 userSchema.methods.comparePassword = async function(candidatePassword) {
