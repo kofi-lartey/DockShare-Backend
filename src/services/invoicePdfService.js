@@ -11,6 +11,9 @@ const PAGE = { w: 595.28, h: 841.89 };
 const MARGIN = 48;
 const CONTENT_W = PAGE.w - MARGIN * 2;
 
+const BRAND_LOGO_URL =
+  'https://res.cloudinary.com/djjgkezui/image/upload/v1783687895/Gemini_Generated_Image_buwg67buwg67buwg_whwjno.png';
+
 // Modern color palette - softer, more elegant
 const C = {
   ink: rgb(0.07, 0.08, 0.12),
@@ -45,22 +48,17 @@ const formatMoney = (amount, currency) =>
     minimumFractionDigits: 2,
   }).format(Number(amount) || 0);
 
-const textMetrics = (text, font, size) => ({
-  width: font.widthOfTextAtSize(text, size),
-  height: font.heightAtSize(size),
-});
-
 const drawText = (page, text, x, y, { font, size = 10, color = C.ink, align = 'left', opacity = 1 } = {}) => {
   let tx = x;
   if (align === 'right') tx = x - font.widthOfTextAtSize(text, size);
   else if (align === 'center') tx = x - font.widthOfTextAtSize(text, size) / 2;
-  page.drawText(text, { 
-    x: tx, 
-    y, 
-    size, 
-    font, 
+  page.drawText(text, {
+    x: tx,
+    y,
+    size,
+    font,
     color,
-    opacity 
+    opacity,
   });
   return font.widthOfTextAtSize(text, size);
 };
@@ -68,12 +66,12 @@ const drawText = (page, text, x, y, { font, size = 10, color = C.ink, align = 'l
 const drawPill = (page, text, x, y, { font, bg, fg = C.white, padX = 10, padY = 5, size = 9 } = {}) => {
   const w = font.widthOfTextAtSize(text, size) + padX * 2;
   const h = size + padY * 2;
-  page.drawRectangle({ 
-    x, 
-    y, 
-    width: w, 
-    height: h, 
-    color: bg, 
+  page.drawRectangle({
+    x,
+    y,
+    width: w,
+    height: h,
+    color: bg,
     borderRadius: 6,
   });
   drawText(page, text, x + padX, y + padY, { font, size, color: fg });
@@ -81,11 +79,11 @@ const drawPill = (page, text, x, y, { font, bg, fg = C.white, padX = 10, padY = 
 };
 
 const drawDivider = (page, x, y, width, color = C.line, thickness = 1) => {
-  page.drawLine({ 
-    start: { x, y }, 
-    end: { x: x + width, y }, 
-    thickness, 
-    color 
+  page.drawLine({
+    start: { x, y },
+    end: { x: x + width, y },
+    thickness,
+    color,
   });
 };
 
@@ -101,6 +99,15 @@ const loadLogo = async () => {
     } catch {
       // try next
     }
+  }
+  try {
+    const res = await fetch(BRAND_LOGO_URL);
+    if (res.ok) {
+      const bytes = new Uint8Array(await res.arrayBuffer());
+      return { bytes, ext: 'png' };
+    }
+  } catch {
+    // network unavailable / blocked
   }
   return null;
 };
@@ -123,7 +130,7 @@ export const generateInvoicePdf = async (invoice, user) => {
     height: headerHeight,
     color: C.surface,
   });
-  
+
   // Subtle accent line with brand color
   page.drawRectangle({
     x: 0,
@@ -136,41 +143,41 @@ export const generateInvoicePdf = async (invoice, user) => {
 
   const logo = await loadLogo();
   const logoY = PAGE.h - MARGIN - 24;
-  
+
   if (logo) {
     const img = await pdfDoc.embedPng(logo.bytes);
     const scale = 0.35;
     const lh = img.height * scale;
     const lw = img.width * scale;
-    page.drawImage(img, { 
-      x: MARGIN, 
-      y: logoY - lh, 
-      width: lw, 
-      height: lh 
+    page.drawImage(img, {
+      x: MARGIN,
+      y: logoY - lh,
+      width: lw,
+      height: lh,
     });
   } else {
-    drawText(page, COMPANY.name, MARGIN, logoY, { 
-      font: bold, 
-      size: 20, 
-      color: C.brand 
+    drawText(page, COMPANY.name, MARGIN, logoY, {
+      font: bold,
+      size: 20,
+      color: C.brand,
     });
   }
 
   // Invoice title with modern styling
   const titleY = PAGE.h - MARGIN - 16;
-  drawText(page, 'INVOICE', PAGE.w - MARGIN, titleY, { 
-    font: bold, 
-    size: 24, 
-    color: C.ink, 
+  drawText(page, 'INVOICE', PAGE.w - MARGIN, titleY, {
+    font: bold,
+    size: 24,
+    color: C.ink,
     align: 'right',
-    opacity: 0.9
+    opacity: 0.9,
   });
-  
-  drawText(page, `#${invoice.invoiceNumber}`, PAGE.w - MARGIN, titleY - 26, { 
-    font, 
-    size: 11, 
-    color: C.muted, 
-    align: 'right' 
+
+  drawText(page, `#${invoice.invoiceNumber}`, PAGE.w - MARGIN, titleY - 26, {
+    font,
+    size: 11,
+    color: C.muted,
+    align: 'right',
   });
 
   y = PAGE.h - headerHeight - 20;
@@ -181,76 +188,76 @@ export const generateInvoicePdf = async (invoice, user) => {
 
   // Left Column - Bill To
   const billToY = y;
-  drawText(page, 'BILL TO', MARGIN, billToY, { 
-    font: bold, 
-    size: 9, 
+  drawText(page, 'BILL TO', MARGIN, billToY, {
+    font: bold,
+    size: 9,
     color: C.muted,
-    opacity: 0.7
+    opacity: 0.7,
   });
-  
-  drawText(page, user?.fullName || 'Valued Customer', MARGIN, billToY - 20, { 
-    font: bold, 
-    size: 14, 
-    color: C.ink 
+
+  drawText(page, user?.fullName || 'Valued Customer', MARGIN, billToY - 20, {
+    font: bold,
+    size: 14,
+    color: C.ink,
   });
-  
-  drawText(page, user?.email || '', MARGIN, billToY - 40, { 
-    font, 
-    size: 10, 
-    color: C.muted 
+
+  drawText(page, user?.email || '', MARGIN, billToY - 40, {
+    font,
+    size: 10,
+    color: C.muted,
   });
-  
+
   const planLabel = planLabels[invoice.plan] || invoice.plan || '—';
-  drawText(page, `Plan: ${planLabel}`, MARGIN, billToY - 58, { 
-    font, 
-    size: 10, 
-    color: C.muted 
+  drawText(page, `Plan: ${planLabel}`, MARGIN, billToY - 58, {
+    font,
+    size: 10,
+    color: C.muted,
   });
 
   // Right Column - Invoice Details
-  drawText(page, 'INVOICE DETAILS', detailsX, billToY, { 
-    font: bold, 
-    size: 9, 
+  drawText(page, 'INVOICE DETAILS', detailsX, billToY, {
+    font: bold,
+    size: 9,
     color: C.muted,
-    opacity: 0.7
+    opacity: 0.7,
   });
-  
+
   const detailItems = [
     ['Issue Date', formatDate(invoice.createdAt)],
     invoice.paidAt ? ['Paid Date', formatDateTime(invoice.paidAt)] : null,
-    invoice.billingPeriod?.start && invoice.billingPeriod?.end 
-      ? ['Period', `${formatDate(invoice.billingPeriod.start)} – ${formatDate(invoice.billingPeriod.end)}`] 
+    invoice.billingPeriod?.start && invoice.billingPeriod?.end
+      ? ['Period', `${formatDate(invoice.billingPeriod.start)} – ${formatDate(invoice.billingPeriod.end)}`]
       : null,
   ].filter(Boolean);
 
   let detailY = billToY - 20;
   detailItems.forEach(([label, value]) => {
-    drawText(page, label, detailsX, detailY, { 
-      font: bold, 
-      size: 9, 
+    drawText(page, label, detailsX, detailY, {
+      font: bold,
+      size: 9,
       color: C.muted,
-      opacity: 0.6
+      opacity: 0.6,
     });
-    drawText(page, value, detailsX + 80, detailY, { 
-      font, 
-      size: 10, 
-      color: C.ink 
+    drawText(page, value, detailsX + 80, detailY, {
+      font,
+      size: 10,
+      color: C.ink,
     });
     detailY -= 20;
   });
 
   // Status pill with modern styling
-  const statusColors = { 
-    paid: C.success, 
-    pending: C.warn, 
-    failed: C.danger, 
-    refunded: C.muted 
+  const statusColors = {
+    paid: C.success,
+    pending: C.warn,
+    failed: C.danger,
+    refunded: C.muted,
   };
   const statusColor = statusColors[invoice.status] || C.muted;
-  drawPill(page, (invoice.status || 'pending').toUpperCase(), detailsX, detailY - 10, { 
-    font: bold, 
-    bg: statusColor, 
-    size: 9 
+  drawPill(page, (invoice.status || 'pending').toUpperCase(), detailsX, detailY - 10, {
+    font: bold,
+    bg: statusColor,
+    size: 9,
   });
 
   y = detailY - 50;
@@ -267,7 +274,7 @@ export const generateInvoicePdf = async (invoice, user) => {
     { key: 'tax', label: 'TAX', x: 0, w: 70, align: 'right' },
     { key: 'amount', label: 'AMOUNT', x: 0, w: 90, align: 'right' },
   ];
-  
+
   let cx = MARGIN;
   for (const c of cols) {
     if (c.key !== 'desc') {
@@ -288,21 +295,21 @@ export const generateInvoicePdf = async (invoice, user) => {
     borderRadius: 4,
   });
 
-  drawText(page, cols[0].label, MARGIN + 8, y, { 
-    font: bold, 
-    size: 9, 
-    color: C.brand 
+  drawText(page, cols[0].label, MARGIN + 8, y, {
+    font: bold,
+    size: 9,
+    color: C.brand,
   });
-  
+
   for (const c of cols.slice(1)) {
-    drawText(page, c.label, c.x + c.w - 8, y, { 
-      font: bold, 
-      size: 9, 
-      color: C.brand, 
-      align: 'right' 
+    drawText(page, c.label, c.x + c.w - 8, y, {
+      font: bold,
+      size: 9,
+      color: C.brand,
+      align: 'right',
     });
   }
-  
+
   y -= 28;
   drawDivider(page, MARGIN, y, CONTENT_W, C.line, 0.5);
   y -= 24;
@@ -310,7 +317,7 @@ export const generateInvoicePdf = async (invoice, user) => {
   // Table rows with alternating backgrounds
   const description = invoice.description || `${planLabel} Plan Subscription`;
   const rowBg = C.surface;
-  
+
   // Item row with subtle background
   page.drawRectangle({
     x: MARGIN,
@@ -321,38 +328,38 @@ export const generateInvoicePdf = async (invoice, user) => {
     borderRadius: 3,
   });
 
-  drawText(page, description, MARGIN + 8, y + 2, { 
-    font, 
-    size: 10, 
-    color: C.ink 
+  drawText(page, description, MARGIN + 8, y + 2, {
+    font,
+    size: 10,
+    color: C.ink,
   });
-  
-  drawText(page, '1', cols[1].x + cols[1].w - 8, y + 2, { 
-    font, 
-    size: 10, 
-    color: C.ink, 
-    align: 'right' 
+
+  drawText(page, '1', cols[1].x + cols[1].w - 8, y + 2, {
+    font,
+    size: 10,
+    color: C.ink,
+    align: 'right',
   });
-  
-  drawText(page, formatMoney(invoice.amount, currency), cols[2].x + cols[2].w - 8, y + 2, { 
-    font, 
-    size: 10, 
-    color: C.ink, 
-    align: 'right' 
+
+  drawText(page, formatMoney(invoice.amount, currency), cols[2].x + cols[2].w - 8, y + 2, {
+    font,
+    size: 10,
+    color: C.ink,
+    align: 'right',
   });
-  
-  drawText(page, formatMoney(0, currency), cols[3].x + cols[3].w - 8, y + 2, { 
-    font, 
-    size: 10, 
-    color: C.muted, 
-    align: 'right' 
+
+  drawText(page, formatMoney(0, currency), cols[3].x + cols[3].w - 8, y + 2, {
+    font,
+    size: 10,
+    color: C.muted,
+    align: 'right',
   });
-  
-  drawText(page, formatMoney(invoice.amount, currency), amountColX - 8, y + 2, { 
-    font: bold, 
-    size: 10, 
-    color: C.ink, 
-    align: 'right' 
+
+  drawText(page, formatMoney(invoice.amount, currency), amountColX - 8, y + 2, {
+    font: bold,
+    size: 10,
+    color: C.ink,
+    align: 'right',
   });
 
   y -= 38;
@@ -363,7 +370,7 @@ export const generateInvoicePdf = async (invoice, user) => {
   const totalsX = PAGE.w - MARGIN;
   const lineW = 240;
   const labelX = totalsX - lineW;
-  
+
   // Card background for totals
   const cardY = y - 8;
   page.drawRectangle({
@@ -379,11 +386,11 @@ export const generateInvoicePdf = async (invoice, user) => {
   const totalRows = [
     ['Subtotal', invoice.amount],
   ];
-  
+
   const coupon = invoice.couponCode
     ? await Coupon.findOne({ code: invoice.couponCode }).lean().catch(() => null)
     : null;
-    
+
   if (coupon) {
     const discount = coupon.type === 'percentage'
       ? invoice.amount * (coupon.value / 100)
@@ -394,22 +401,22 @@ export const generateInvoicePdf = async (invoice, user) => {
 
   let runningTotal = 0;
   let totalY = y;
-  
+
   for (const [label, val] of totalRows) {
     runningTotal += val;
-    drawText(page, label, labelX, totalY, { 
-      font: label.includes('Total') ? bold : font, 
-      size: label.includes('Total') ? 10 : 9, 
-      color: label.includes('Total') ? C.ink : C.muted 
+    drawText(page, label, labelX, totalY, {
+      font: label.includes('Total') ? bold : font,
+      size: label.includes('Total') ? 10 : 9,
+      color: label.includes('Total') ? C.ink : C.muted,
     });
-    
+
     const sign = val < 0 ? '-' : '';
     const formattedVal = `${sign}${formatMoney(Math.abs(val), currency)}`;
-    drawText(page, formattedVal, totalsX, totalY, { 
-      font: label.includes('Total') ? bold : font, 
-      size: label.includes('Total') ? 10 : 9, 
-      color: label.includes('Total') ? C.ink : C.muted, 
-      align: 'right' 
+    drawText(page, formattedVal, totalsX, totalY, {
+      font: label.includes('Total') ? bold : font,
+      size: label.includes('Total') ? 10 : 9,
+      color: label.includes('Total') ? C.ink : C.muted,
+      align: 'right',
     });
     totalY -= 20;
   }
@@ -425,18 +432,18 @@ export const generateInvoicePdf = async (invoice, user) => {
     borderRadius: 6,
     opacity: 0.1,
   });
-  
-  drawText(page, 'TOTAL DUE', labelX + 4, totalY + 4, { 
-    font: bold, 
-    size: 13, 
-    color: C.brand 
+
+  drawText(page, 'TOTAL DUE', labelX + 4, totalY + 4, {
+    font: bold,
+    size: 13,
+    color: C.brand,
   });
-  
-  drawText(page, formatMoney(runningTotal, currency), totalsX - 4, totalY + 4, { 
-    font: bold, 
-    size: 15, 
-    color: C.brand, 
-    align: 'right' 
+
+  drawText(page, formatMoney(runningTotal, currency), totalsX - 4, totalY + 4, {
+    font: bold,
+    size: 15,
+    color: C.brand,
+    align: 'right',
   });
 
   y = totalY - 44;
@@ -447,73 +454,73 @@ export const generateInvoicePdf = async (invoice, user) => {
 
   // Footer columns
   const footerColW = CONTENT_W / 3 - 12;
-  
-  drawText(page, COMPANY.name, MARGIN, y, { 
-    font: bold, 
-    size: 10, 
-    color: C.ink 
+
+  drawText(page, COMPANY.name, MARGIN, y, {
+    font: bold,
+    size: 10,
+    color: C.ink,
   });
-  
+
   const footerY = y - 16;
-  drawText(page, COMPANY.address, MARGIN, footerY, { 
-    font, 
-    size: 9, 
-    color: C.muted 
+  drawText(page, COMPANY.address, MARGIN, footerY, {
+    font,
+    size: 9,
+    color: C.muted,
   });
-  
-  drawText(page, COMPANY.email, MARGIN, footerY - 16, { 
-    font, 
-    size: 9, 
-    color: C.muted 
+
+  drawText(page, COMPANY.email, MARGIN, footerY - 16, {
+    font,
+    size: 9,
+    color: C.muted,
   });
-  
+
   if (COMPANY.taxId) {
-    drawText(page, `Tax ID: ${COMPANY.taxId}`, MARGIN, footerY - 32, { 
-      font, 
-      size: 9, 
-      color: C.muted 
+    drawText(page, `Tax ID: ${COMPANY.taxId}`, MARGIN, footerY - 32, {
+      font,
+      size: 9,
+      color: C.muted,
     });
   }
 
   // Center column - support
   const centerX = MARGIN + footerColW + 16;
-  drawText(page, 'SUPPORT', centerX, y, { 
-    font: bold, 
-    size: 9, 
+  drawText(page, 'SUPPORT', centerX, y, {
+    font: bold,
+    size: 9,
     color: C.muted,
-    opacity: 0.7
+    opacity: 0.7,
   });
-  drawText(page, COMPANY.email, centerX, footerY, { 
-    font, 
-    size: 9, 
-    color: C.muted 
+  drawText(page, COMPANY.email, centerX, footerY, {
+    font,
+    size: 9,
+    color: C.muted,
   });
-  drawText(page, COMPANY.website, centerX, footerY - 16, { 
-    font, 
-    size: 9, 
-    color: C.brand 
+  drawText(page, COMPANY.website, centerX, footerY - 16, {
+    font,
+    size: 9,
+    color: C.brand,
   });
 
   // Right column - payment info
   const rightX = PAGE.w - MARGIN - footerColW;
-  drawText(page, 'PAYMENT', rightX, y, { 
-    font: bold, 
-    size: 9, 
+  drawText(page, 'PAYMENT', rightX, y, {
+    font: bold,
+    size: 9,
     color: C.muted,
     opacity: 0.7,
-    align: 'right'
+    align: 'right',
   });
-  drawText(page, 'Payments processed securely', rightX, footerY, { 
-    font, 
-    size: 9, 
+  drawText(page, 'Payments processed securely', rightX, footerY, {
+    font,
+    size: 9,
     color: C.muted,
-    align: 'right'
+    align: 'right',
   });
-  drawText(page, 'Thank you for your business!', rightX, footerY - 16, { 
-    font: bold, 
-    size: 9, 
+  drawText(page, 'Thank you for your business!', rightX, footerY - 16, {
+    font: bold,
+    size: 9,
     color: C.brand,
-    align: 'right'
+    align: 'right',
   });
 
   const pdfBytes = await pdfDoc.save();
