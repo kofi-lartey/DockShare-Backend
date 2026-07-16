@@ -1,7 +1,8 @@
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 import {
-  setup, hasAdmin, login, loginVerify, loginOtp, loginOtpVerify, switchMfaMethod, logout
+  setup, hasAdmin, getAdminProfile, updateAdmin,
+  login, loginVerify, loginOtp, loginOtpVerify, switchMfaMethod, logout
 } from '../controllers/adminAuthController.js';
 import { listUsers, getUser, createUser, updateUser, deleteUser } from '../controllers/adminUserController.js';
 import { listCoupons, createCoupon, updateCoupon, deleteCoupon } from '../controllers/adminCouponController.js';
@@ -31,6 +32,8 @@ router.use(requireMfa);
 
 router.post('/logout', logout);
 router.put('/security/mfa', switchMfaMethod);
+router.get('/profile', getAdminProfile);
+router.put('/profile', updateAdmin);
 
 router.get('/users', listUsers);
 router.get('/users/:id', getUser);

@@ -10,21 +10,18 @@ const JWT_SECRET = process.env.JWT_SECRET;
 const MFA_TOKEN_TTL = '5m';
 const ADMIN_TOKEN_TTL = process.env.ADMIN_JWT_EXPIRES_IN || '12h';
 
-// Step-1 challenge token: proves identity but is NOT a full session.
 const signMfaToken = (user) => jwt.sign(
   { id: user._id, email: user.email, role: user.role, mfa: 'pending', jti: crypto.randomUUID() },
   JWT_SECRET,
   { expiresIn: MFA_TOKEN_TTL }
 );
 
-// Step-2 full admin session: carries the verified MFA claim.
 const signAdminToken = (user) => jwt.sign(
   { id: user._id, email: user.email, role: user.role, mfa: true, jti: crypto.randomUUID() },
   JWT_SECRET,
   { expiresIn: ADMIN_TOKEN_TTL }
 );
 
-// Verifies a step-1 challenge token; rejects anything that isn't a pending MFA challenge.
 const verifyMfaToken = (token) => {
   const decoded = jwt.verify(token, JWT_SECRET);
   if (decoded.mfa !== 'pending') throw new Error('INVALID_MFA_TOKEN');
@@ -33,10 +30,20 @@ const verifyMfaToken = (token) => {
 
 const SECRET_SELECT = '-password -adminCodeHash -emailVerificationToken -emailVerificationExpires -emailOTP -emailOTPExpires -emailOTPSentAt -resetPasswordToken -resetPasswordExpires';
 
-/**
- * Restricted onboarding: initializes the single, unique Administrator.
- * Enforced server-side — succeeds only when zero admins already exist.
- */
+const sanitizeAdmin = (user) => {
+  const obj = user.toObject();
+  delete obj.password;
+  delete obj.adminCodeHash;
+  delete obj.emailVerificationToken;
+  delete obj.emailVerificationExpires;
+  delete obj.emailOTP;
+  delete obj.emailOTPExpires;
+  delete obj.emailOTPSentAt;
+  delete obj.resetPasswordToken;
+  delete obj.resetPasswordExpires;
+  return obj;
+};
+
 export const setup = async (req, res) => {
   try {
     const { email, password, adminCode, confirmCode, mfaMethod } = req.body;
@@ -57,7 +64,7 @@ export const setup = async (req, res) => {
     if (await User.exists({ role: 'admin' })) {
       return res.status(409).json({ success: false, message: 'An administrator already exists', code: 'ADMIN_EXISTS' });
     }
-    if (await User.exists({ email: email.toLowerCase() })) {
+    if (await User.exists({ email: email.toLowerCase().trim() })) {
       return res.status(409).json({ success: false, message: 'A user with this email already exists' });
     }
 
@@ -65,7 +72,7 @@ export const setup = async (req, res) => {
     const fullName = email.split('@')[0];
     const user = await User.create({
       fullName,
-      email: email.toLowerCase(),
+      email: email.toLowerCase().trim(),
       password: await bcrypt.hash(password, salt),
       emailVerified: true,
       role: 'admin',
@@ -80,9 +87,7 @@ export const setup = async (req, res) => {
 
     await logAudit({ actor: user.email, action: 'admin.setup', target: user.email, ip: req.ip });
 
-    const userData = user.toObject();
-    delete userData.password;
-    delete userData.adminCodeHash;
+    const userData = sanitizeAdmin(user);
 
     res.status(201).json({
       success: true,
@@ -90,6 +95,7 @@ export const setup = async (req, res) => {
       message: 'Administrator initialized'
     });
   } catch (error) {
+    console.error('Admin setup error:', error);
     res.status(500).json({ success: false, message: 'Failed to initialize administrator' });
   }
 };
@@ -103,7 +109,72 @@ export const hasAdmin = async (req, res) => {
   }
 };
 
-// ---- Option A: Username/Email + Password, then Admin Code ----
+export const getAdminProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select(SECRET_SELECT);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Admin not found' });
+    }
+    res.json({ success: true, data: sanitizeAdmin(user) });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to retrieve admin profile' });
+  }
+};
+
+export const updateAdmin = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Admin not found' });
+    }
+
+    const { fullName, email, currentPassword, newPassword, adminCode, mfaMethod } = req.body;
+
+    if (email && email !== user.email) {
+      const emailExists = await User.findOne({ email: email.toLowerCase().trim(), _id: { $ne: user._id } });
+      if (emailExists) {
+        return res.status(409).json({ success: false, message: 'Email already in use' });
+      }
+      user.email = email.toLowerCase().trim();
+    }
+
+    if (fullName) user.fullName = fullName;
+
+    if (mfaMethod && ['password+code', 'otp+code'].includes(mfaMethod)) {
+      user.mfaMethod = mfaMethod;
+    }
+
+    if (adminCode !== undefined) {
+      if (typeof adminCode === 'string' && adminCode.length >= 6) {
+        const salt = await bcrypt.genSalt(10);
+        user.adminCodeHash = await bcrypt.hash(adminCode, salt);
+      }
+    }
+
+    if (newPassword) {
+      if (!currentPassword) {
+        return res.status(400).json({ success: false, message: 'Current password is required' });
+      }
+      if (!(await user.comparePassword(currentPassword))) {
+        return res.status(401).json({ success: false, message: 'Invalid current password' });
+      }
+      if (newPassword.length < 8) {
+        return res.status(400).json({ success: false, message: 'New password must be at least 8 characters' });
+      }
+      const salt = await bcrypt.genSalt(10);
+      user.password = await bcrypt.hash(newPassword, salt);
+    }
+
+    await user.save();
+    await logAudit({ actor: user.email, action: 'admin.profile.update', target: user.email, ip: req.ip });
+
+    res.json({ success: true, data: sanitizeAdmin(user), message: 'Admin profile updated' });
+  } catch (error) {
+    console.error('Admin update error:', error);
+    res.status(500).json({ success: false, message: 'Failed to update admin profile' });
+  }
+};
+
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -111,7 +182,7 @@ export const login = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Email and password are required' });
     }
 
-    const user = await User.findOne({ email: email.toLowerCase(), role: 'admin' });
+    const user = await User.findOne({ email: email.toLowerCase().trim(), role: 'admin' });
     if (!user || !(await user.comparePassword(password))) {
       return res.status(401).json({ success: false, message: 'Invalid admin credentials' });
     }
@@ -146,7 +217,7 @@ export const loginVerify = async (req, res) => {
     if (!user) {
       return res.status(401).json({ success: false, message: 'User not found' });
     }
-    if (!(await bcrypt.compare(adminCode, user.adminCodeHash || ''))) {
+    if (!(await bcrypt.compare(adminCode.trim(), user.adminCodeHash || ''))) {
       return res.status(401).json({ success: false, message: 'Invalid Admin Code' });
     }
 
@@ -162,7 +233,6 @@ export const loginVerify = async (req, res) => {
   }
 };
 
-// ---- Option B: Email + OTP, then Admin Code ----
 export const loginOtp = async (req, res) => {
   try {
     const { email } = req.body;
@@ -170,12 +240,12 @@ export const loginOtp = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Email is required' });
     }
 
-    const user = await User.findOne({ email: email.toLowerCase(), role: 'admin' });
+    const user = await User.findOne({ email: email.toLowerCase().trim(), role: 'admin' });
     if (!user) {
       return res.status(401).json({ success: false, message: 'Invalid admin credentials' });
     }
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otp = crypto.randomInt(100000, 999999).toString();
     user.emailOTP = otp;
     user.emailOTPExpires = new Date(Date.now() + 10 * 60 * 1000);
     user.emailOTPSentAt = new Date();
@@ -206,16 +276,21 @@ export const loginOtpVerify = async (req, res) => {
       return res.status(400).json({ success: false, message: 'OTP and Admin Code are required' });
     }
 
+    const cleanedOtp = typeof otp === 'string' ? otp.trim().replace(/\s/g, '') : otp;
+    if (!/^\d{6}$/.test(cleanedOtp)) {
+      return res.status(400).json({ success: false, message: 'OTP must be exactly 6 digits' });
+    }
+
     const user = await User.findOne({
       _id: decoded.id,
-      emailOTP: otp,
+      emailOTP: cleanedOtp,
       emailOTPExpires: { $gt: new Date() }
     }).select('+adminCodeHash');
 
     if (!user) {
       return res.status(401).json({ success: false, message: 'Invalid or expired OTP' });
     }
-    if (!(await bcrypt.compare(adminCode, user.adminCodeHash || ''))) {
+    if (!(await bcrypt.compare(adminCode.trim(), user.adminCodeHash || ''))) {
       return res.status(401).json({ success: false, message: 'Invalid Admin Code' });
     }
 
@@ -236,7 +311,6 @@ export const loginOtpVerify = async (req, res) => {
   }
 };
 
-// ---- Protected (requireMfa) ----
 export const switchMfaMethod = async (req, res) => {
   try {
     const { method } = req.body;
@@ -264,67 +338,8 @@ export const logout = async (req, res) => {
   }
 };
 
-/**
- * Idempotent env-driven bootstrap. On first start (no admin exists), creates
- * or promotes the Administrator from ADMIN_EMAIL / ADMIN_PASSWORD / ADMIN_CODE
- * so the console is reachable without manually hitting /api/admin/setup.
- * If the admin email already belongs to a regular account, that account is
- * promoted (and its password/Admin Code are set to the env values) rather
- * than failing on a duplicate key. No-op when an admin already exists or when
- * env vars are absent.
- */
-export const bootstrapAdminFromEnv = async () => {
-  try {
-    const email = process.env.ADMIN_EMAIL;
-    const password = process.env.ADMIN_PASSWORD;
-    const adminCode = process.env.ADMIN_CODE;
-    if (!email || !password || !adminCode) return;
-
-    if (await User.exists({ role: 'admin' })) return;
-
-    const salt = await bcrypt.genSalt(10);
-    const adminCodeHash = await bcrypt.hash(adminCode, salt);
-    const lowerEmail = email.toLowerCase();
-    const fullName = email.split('@')[0];
-
-    const existing = await User.findOne({ email: lowerEmail });
-    if (existing) {
-      existing.role = 'admin';
-      existing.permissions = ['user.*', 'admin.*'];
-      existing.adminCodeHash = adminCodeHash;
-      existing.mfaMethod = process.env.ADMIN_MFA_METHOD || 'password+code';
-      existing.password = await bcrypt.hash(password, salt);
-      existing.emailVerified = true;
-      existing.plan = 'express';
-      existing.subscriptionStatus = 'active';
-      existing.status = 'active';
-      await existing.save();
-      console.log(`[admin] promoted existing account to administrator: ${email}`);
-      return;
-    }
-
-    await User.create({
-      fullName,
-      email: lowerEmail,
-      password: await bcrypt.hash(password, salt),
-      emailVerified: true,
-      role: 'admin',
-      permissions: ['user.*', 'admin.*'],
-      adminCodeHash,
-      mfaMethod: process.env.ADMIN_MFA_METHOD || 'password+code',
-      plan: 'express',
-      subscriptionStatus: 'active',
-      status: 'active',
-      avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=4f46e5&color=fff&size=128`
-    });
-
-    console.log(`[admin] bootstrapped administrator from env: ${email}`);
-  } catch (error) {
-    console.error('[admin] env bootstrap failed:', error.message);
-  }
-};
-
 export const adminAuthController = {
-  setup, hasAdmin, login, loginVerify, loginOtp, loginOtpVerify,
-  switchMfaMethod, logout, bootstrapAdminFromEnv
+  setup, hasAdmin, getAdminProfile, updateAdmin,
+  login, loginVerify, loginOtp, loginOtpVerify,
+  switchMfaMethod, logout
 };

@@ -13,7 +13,6 @@ import paymentRoutes from './routes/paymentRoutes.js';
 import ogRoutes from './routes/ogRoutes.js';
 import couponRoutes from './routes/couponRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
-import { bootstrapAdminFromEnv } from './controllers/adminAuthController.js';
 import { corsMiddleware } from './config/cors.js';
 
 dotenv.config();
@@ -22,7 +21,7 @@ const app = express();
 
 app.set('trust proxy', 1);
 
-connectDB().then(() => bootstrapAdminFromEnv());
+connectDB();
 
 app.use(helmet());
 app.use(corsMiddleware);
