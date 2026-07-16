@@ -6,6 +6,7 @@ import {
   forgotPassword, 
   resetPassword,
   getOnboardingStatus,
+  getMe,
   logout,
   resendVerification,
   sendOtpLogin,
@@ -25,6 +26,7 @@ authRoutes.post('/verify-otp', verifyOtp);
 authRoutes.post('/forgot-password', rateLimiter, forgotPassword);
 authRoutes.post('/reset-password/:token', rateLimiter, resetPassword);
 authRoutes.get('/onboarding-status', auth, getOnboardingStatus);
+authRoutes.get('/me', auth, getMe);
 authRoutes.post('/logout', auth, logout);
 
 export default authRoutes;

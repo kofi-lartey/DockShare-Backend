@@ -256,10 +256,16 @@ export const getInvoices = async (req, res) => {
     const invoices = await Invoice.find({ userId: req.user._id })
       .sort({ createdAt: -1 })
       .select('-pdfUrl');
-    
+
+    const data = invoices.map((inv) => {
+      const obj = inv.toObject();
+      obj.id = obj._id.toString();
+      return obj;
+    });
+
     res.json({
       success: true,
-      data: invoices,
+      data,
       message: 'Invoices retrieved'
     });
   } catch (error) {

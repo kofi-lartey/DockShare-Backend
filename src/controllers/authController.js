@@ -481,6 +481,30 @@ export const getOnboardingStatus = async (req, res) => {
   }
 };
 
+export const getMe = async (req, res) => {
+  try {
+    const user = req.user;
+    const subscription = await Subscription.findOne({ userId: user._id });
+    res.json({
+      success: true,
+      data: {
+        ...user.toObject(),
+        subscription: subscription ? {
+          plan: subscription.plan,
+          status: subscription.status,
+          provider: subscription.provider,
+          nextBillingDate: subscription.nextBillingDate,
+        } : null
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve user'
+    });
+  }
+};
+
 export const logout = async (req, res) => {
   try {
     const token = req.header('Authorization')?.replace('Bearer ', '');
