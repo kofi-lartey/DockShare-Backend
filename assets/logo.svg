@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="220" height="64" viewBox="0 0 220 64">
+  <rect x="0" y="10" width="44" height="44" rx="10" fill="#3360FA"/>
+  <path d="M14 32 L22 40 L32 22" stroke="#fff" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="56" y="30" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="700" fill="#1f2433">DocShare</text>
+  <text x="56" y="50" font-family="Helvetica, Arial, sans-serif" font-size="15" font-weight="700" fill="#3360FA">PRO</text>
+</svg>
