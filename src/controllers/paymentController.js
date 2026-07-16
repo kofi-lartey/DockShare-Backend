@@ -39,7 +39,7 @@ export const downloadInvoice = async (req, res) => {
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader(
       'Content-Disposition',
-      `inline; filename="invoice-${invoice.invoiceNumber}.pdf"`
+      `attachment; filename="invoice-${invoice.invoiceNumber}.pdf"`
     );
     return res.send(buffer);
   } catch (error) {

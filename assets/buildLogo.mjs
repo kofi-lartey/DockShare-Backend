@@ -1,39 +1,43 @@
-// One-time generator: writes backend/assets/logo.png (a clean brand mark)
+// One-time generator: writes backend/assets/logo.png (refined brand mark)
 // rendered with only Node built-ins (zlib + fs). No external dependencies.
-// The SVG source of truth lives at backend/assets/logo.svg; re-run this after
-// editing the SVG by hand-tracing the same shapes, or use `resvg`/`sharp` in CI.
+// SVG source of truth: backend/assets/logo.svg. Re-run after edits, or use
+// `resvg`/`sharp` in CI for pixel-perfect rasterization.
 import zlib from 'zlib';
 import fs from 'fs';
 
-const W = 220, H = 64;
+const W = 240, H = 64;
 const bg = [255, 255, 255];
-const brand = [0x33, 0x60, 0xFA];
+const brandTop = [0x4F, 0x7C, 0xFF];
+const brandBot = [0x2E, 0x4F, 0xE0];
 const white = [255, 255, 255];
-const ink = [0x1f, 0x24, 0x33];
+const ink = [0x1B, 0x22, 0x33];
 
+// framebuffer
 const px = new Uint8Array(W * H * 3).fill(0);
 const set = (x, y, c) => {
   if (x < 0 || y < 0 || x >= W || y >= H) return;
   const i = (y * W + x) * 3;
   px[i] = c[0]; px[i + 1] = c[1]; px[i + 2] = c[2];
 };
-
-// background
 for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) set(x, y, bg);
 
-// rounded square brand tile (approx via distance from a rounded rect)
-const bx = 0, by = 10, bw = 44, bh = 44, r = 10;
+// rounded gradient tile
+const bx = 2, by = 12, bw = 40, bh = 40, r = 12;
 for (let y = by; y < by + bh; y++) {
   for (let x = bx; x < bx + bw; x++) {
-    let inside = true;
     const cx = Math.min(Math.max(x, bx + r), bx + bw - r);
     const cy = Math.min(Math.max(y, by + r), by + bh - r);
-    if ((x - cx) ** 2 + (y - cy) ** 2 > r * r) inside = false;
-    if (inside) set(x, y, brand);
+    if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) {
+      const t = (y - by) / bh;
+      set(x, y, [
+        Math.round(brandTop[0] + (brandBot[0] - brandTop[0]) * t),
+        Math.round(brandTop[1] + (brandBot[1] - brandTop[1]) * t),
+        Math.round(brandTop[2] + (brandBot[2] - brandTop[2]) * t),
+      ]);
+    }
   }
 }
-
-// checkmark (white) – simple polyline rasterization
+// checkmark
 const line = (x0, y0, x1, y1) => {
   const steps = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) * 2;
   for (let s = 0; s <= steps; s++) {
@@ -43,29 +47,20 @@ const line = (x0, y0, x1, y1) => {
     for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) set(x + dx, y + dy, white);
   }
 };
-line(14, 32, 22, 40);
-line(22, 40, 32, 22);
+line(16, 33, 22, 39);
+line(22, 39, 31, 23);
 
-// wordmark (blocky "DocShare PRO" approximation using filled rects for letters)
+// wordmark approximated with clean bars (legible at small scale)
 const rect = (x, y, w, h, c) => { for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) set(xx, yy, c); };
-// "DocShare" hint: just draw a brand bar + tagline block (keeps it clean/legible at small size)
-rect(56, 22, 120, 8, ink);
-rect(56, 38, 70, 8, brand);
+rect(54, 14, 150, 9, ink);   // "DocShare"
+rect(54, 36, 64, 9, brandBot); // "PRO"
 
 const raw = Buffer.alloc((W * 3 + 1) * H);
 for (let y = 0; y < H; y++) {
   raw[y * (W * 3 + 1)] = 0;
   for (let x = 0; x < W * 3; x++) raw[y * (W * 3 + 1) + 1 + x] = px[y * W * 3 + x];
 }
-
-const crc32 = (buf) => {
-  let c = ~0;
-  for (let i = 0; i < buf.length; i++) {
-    c ^= buf[i];
-    for (let k = 0; k < 8; k++) c = (c >>> 1) ^ (0xedb88320 & -(c & 1));
-  }
-  return ~c >>> 0;
-};
+const crc32 = (buf) => { let c = ~0; for (let i = 0; i < buf.length; i++) { c ^= buf[i]; for (let k = 0; k < 8; k++) c = (c >>> 1) ^ (0xedb88320 & -(c & 1)); } return ~c >>> 0; };
 const chunk = (type, data) => {
   const len = Buffer.alloc(4); len.writeUInt32BE(data.length, 0);
   const t = Buffer.from(type, 'ascii');
@@ -78,9 +73,7 @@ ihdr[8] = 8; ihdr[9] = 2; ihdr[10] = 0; ihdr[11] = 0; ihdr[12] = 0;
 const idat = zlib.deflateSync(raw);
 const png = Buffer.concat([
   Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
-  chunk('IHDR', ihdr),
-  chunk('IDAT', idat),
-  chunk('IEND', Buffer.alloc(0)),
+  chunk('IHDR', ihdr), chunk('IDAT', idat), chunk('IEND', Buffer.alloc(0)),
 ]);
 fs.writeFileSync(new URL('./logo.png', import.meta.url), png);
 console.log('Wrote logo.png', png.length, 'bytes');

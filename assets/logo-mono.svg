@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="64" viewBox="0 0 240 64" role="img" aria-label="DocShare Pro monochrome">
+  <rect x="2" y="12" width="40" height="40" rx="12" fill="#1B2233"/>
+  <path d="M14 33.5 L20.5 40 L30 23" fill="none" stroke="#FFFFFF" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="54" y="30" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="22" font-weight="700" letter-spacing="-0.4" fill="#1B2233">DocShare</text>
+  <text x="54" y="49" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="800" letter-spacing="3" fill="#1B2233">PRO</text>
+</svg>

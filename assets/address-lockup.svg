@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="40" viewBox="0 0 320 40" role="img" aria-label="DocShare Pro address lockup">
+  <rect x="0.5" y="0.5" width="319" height="39" rx="8" fill="#F5F7FF" stroke="#E2E8F7"/>
+  <rect x="14" y="11" width="18" height="18" rx="5" fill="#2E4FE0"/>
+  <path d="M19 16.5 L21.5 19 L25.5 14" fill="none" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="42" y="17" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="700" fill="#1B2233">DocShare Pro</text>
+  <text x="42" y="31" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" font-weight="500" fill="#4A5468">pr/md/057-Prampram</text>
+  <line x1="180" y1="9" x2="180" y2="31" stroke="#E2E8F7"/>
+  <text x="196" y="17" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" font-weight="500" fill="#4A5468">billing@docshare.io</text>
+  <text x="196" y="31" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" font-weight="500" fill="#4A5468">docshare.io</text>
+</svg>
