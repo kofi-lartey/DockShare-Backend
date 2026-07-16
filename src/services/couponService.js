@@ -88,14 +88,20 @@ export const applyCoupon = (coupon, baseAmount) => {
  */
 export const redeemCoupon = async (code, transactionRef) => {
   if (!code) return false;
+  const coupon = await Coupon.findOne({ code: code.toUpperCase().trim() });
+  if (!coupon || coupon.maxRedemptions === null) {
+    // null maxRedemptions = unlimited, or coupon gone: just increment.
+    const result = await Coupon.updateOne(
+      { code: code.toUpperCase().trim() },
+      { $inc: { usedCount: 1 } }
+    );
+    return result.modifiedCount > 0;
+  }
   const result = await Coupon.updateOne(
-    { code: code.toUpperCase().trim(), usedCount: { $lt: couponMaxRedemptionsSelector() } },
+    { code: code.toUpperCase().trim(), usedCount: { $lt: coupon.maxRedemptions } },
     { $inc: { usedCount: 1 } }
   );
   return result.modifiedCount > 0;
 };
-
-// Helper to keep the update selector valid when maxRedemptions is null.
-const couponMaxRedemptionsSelector = () => Number.MAX_SAFE_INTEGER;
 
 export const couponService = { validateCoupon, applyCoupon, redeemCoupon };

@@ -5,7 +5,7 @@ import { File } from '../models/File.js';
 import { generateInvoiceNumber } from '../utils/helpers.js';
 import { stripeService } from '../services/stripeService.js';
 import { paystackService } from '../services/paystackService.js';
-import { validateCoupon } from '../services/couponService.js';
+import { validateCoupon, redeemCoupon } from '../services/couponService.js';
 
 export const createSubscription = async (req, res) => {
   try {
@@ -46,10 +46,13 @@ export const createSubscription = async (req, res) => {
     let transactionRef = null;
     let provider = paymentMethod || 'stripe';
 
-    if (planId !== 'free') {
-      const basePrices = { pro: 20, express: 50 };
-      const amount = couponResult ? couponResult.finalAmount : basePrices[planId];
+    // A coupon that brings the price to 0 means the user pays nothing, so we
+    // skip the payment provider entirely and activate the plan immediately.
+    const basePrices = { pro: 20, express: 50 };
+    const amount = couponResult ? couponResult.finalAmount : basePrices[planId];
+    const isFreeCoupon = planId !== 'free' && amount <= 0;
 
+    if (planId !== 'free' && !isFreeCoupon) {
       if (provider === 'stripe') {
         const session = await stripeService.createCheckoutSession({
           planType: planId,
@@ -81,21 +84,25 @@ export const createSubscription = async (req, res) => {
     const prices = { free: 0, pro: 20, express: 50 };
     const finalAmount = couponResult ? couponResult.finalAmount : prices[planId];
     const currency = provider === 'paystack' ? 'GHS' : 'USD';
+    // The plan is active immediately when it's the free tier or a coupon
+    // brought the price to 0 (no payment provider involved).
+    const subscriptionActive = planId === 'free' || isFreeCoupon;
 
     if (subscription) {
       subscription.plan = planId;
-      subscription.status = planId === 'free' ? 'active' : 'pending';
+      subscription.status = subscriptionActive ? 'active' : 'pending';
       subscription.paymentMethodId = paymentMethodId;
       subscription.nextBillingDate = nextBillingDate;
       subscription.cancelAtPeriodEnd = false;
       subscription.provider = provider;
       subscription.transactionRef = transactionRef;
       subscription.couponCode = couponResult ? couponResult.code : subscription.couponCode;
-      subscription.lastPaymentDate = planId === 'free' ? new Date() : null;
+      subscription.couponRedeemed = subscription.couponRedeemed || isFreeCoupon;
+      subscription.lastPaymentDate = subscriptionActive ? new Date() : null;
       subscription.paymentHistory.push({
         date: new Date(),
         amount: finalAmount,
-        status: planId === 'free' ? 'success' : 'pending',
+        status: subscriptionActive ? 'success' : 'pending',
         provider,
         transactionRef,
         couponCode: couponResult ? couponResult.code : undefined
@@ -106,18 +113,19 @@ export const createSubscription = async (req, res) => {
       subscription = await Subscription.create({
         userId: user._id,
         plan: planId,
-        status: planId === 'free' ? 'active' : 'pending',
+        status: subscriptionActive ? 'active' : 'pending',
         paymentMethodId,
         provider,
         transactionRef,
         couponCode: couponResult ? couponResult.code : undefined,
+        couponRedeemed: isFreeCoupon,
         nextBillingDate,
-        lastPaymentDate: planId === 'free' ? new Date() : null,
+        lastPaymentDate: subscriptionActive ? new Date() : null,
       });
     }
 
     user.plan = planId;
-    user.subscriptionStatus = planId === 'free' ? 'active' : 'incomplete';
+    user.subscriptionStatus = subscriptionActive ? 'active' : 'incomplete';
     user.subscriptionStartDate = subscription.startDate || new Date();
     user.nextBillingDate = nextBillingDate;
     await user.save();
@@ -127,7 +135,7 @@ export const createSubscription = async (req, res) => {
       invoiceNumber: generateInvoiceNumber(),
       amount: finalAmount,
       currency,
-      status: planId === 'free' ? 'paid' : 'pending',
+      status: subscriptionActive ? 'paid' : 'pending',
       plan: planId,
       provider,
       transactionRef,
@@ -137,8 +145,14 @@ export const createSubscription = async (req, res) => {
         start: new Date(),
         end: nextBillingDate,
       },
-      paidAt: planId === 'free' ? new Date() : null,
+      paidAt: subscriptionActive ? new Date() : null,
     });
+
+    // For a zero-amount coupon there is no provider webhook, so redeem the
+    // coupon inline exactly once (guarded by the subscription's couponRedeemed).
+    if (isFreeCoupon && couponResult) {
+      await redeemCoupon(couponResult.code, `freecoupon_${subscription._id}`);
+    }
 
     res.status(201).json({
       success: true,
@@ -151,7 +165,11 @@ export const createSubscription = async (req, res) => {
         invoice,
         payment: paymentResult,
       },
-      message: planId === 'free' ? 'Free plan activated' : 'Subscription created, complete payment',
+      message: isFreeCoupon
+        ? 'Subscription activated with free coupon'
+        : planId === 'free'
+          ? 'Free plan activated'
+          : 'Subscription created, complete payment',
     });
   } catch (error) {
     console.error('Subscription creation error:', error.message);
