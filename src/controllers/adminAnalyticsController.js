@@ -96,9 +96,23 @@ export const getAnalytics = async (req, res) => {
   }
 };
 
+const normalizeAuditRow = (row) => {
+  const at = row.at instanceof Date ? row.at : new Date(row.at);
+  const atValid = at instanceof Date && !Number.isNaN(at.getTime());
+  return {
+    ...row,
+    at: atValid ? at.toISOString() : null,
+    actor: row.actor || null,
+    target: row.target ?? null,
+    ip: row.ip ?? null,
+    method: row.method ?? null,
+  };
+};
+
 export const getAuditLog = async (req, res) => {
   try {
-    const log = await AuditLog.find().sort({ at: -1 }).limit(100).lean();
+    const rows = await AuditLog.find().sort({ at: -1 }).limit(100).lean();
+    const log = rows.map(normalizeAuditRow);
     res.json({ success: true, data: { log } });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to retrieve audit log' });
